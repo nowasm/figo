@@ -8,10 +8,16 @@ option(FIGMALIB_BACKEND_RAYLIB "Build the raylib backend" ON)
 option(FIGMALIB_BUILD_EXAMPLES "Build example apps" ON)
 
 # ThorVG: prebuilt static library (meson: --default-library=static -Dstatic=true).
+# Prefer a CPU+GL build (engines=cpu,gl) when present — enables the zero-copy
+# GPU path; the CPU-only build still works (GPU calls fall back gracefully).
 set(THORVG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/inc" CACHE PATH
     "Directory containing thorvg.h")
-set(THORVG_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static/src/libthorvg-1.a"
-    CACHE FILEPATH "Path to the static thorvg library")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static_gl/src/libthorvg-1.a")
+    set(_thorvg_default "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static_gl/src/libthorvg-1.a")
+else()
+    set(_thorvg_default "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static/src/libthorvg-1.a")
+endif()
+set(THORVG_LIBRARY "${_thorvg_default}" CACHE FILEPATH "Path to the static thorvg library")
 
 if(NOT EXISTS "${THORVG_LIBRARY}")
     message(FATAL_ERROR "ThorVG static library not found at ${THORVG_LIBRARY}. "
@@ -37,6 +43,7 @@ add_library(figmalib STATIC
     src/canvas_parser.cpp
     src/fig_loader.cpp
     src/serializer.cpp
+    src/layout.cpp
     src/svg_path.cpp
     src/font_provider.cpp
     src/scene_builder.cpp
@@ -45,6 +52,20 @@ add_library(figmalib STATIC
 )
 target_compile_definitions(figmalib PRIVATE
     FIGMALIB_FIG2JSON_DEFAULT="${FIGMALIB_FIG2JSON}")
+
+# fig2json as a static library → in-process .fig conversion (no subprocess).
+# Build it with: cargo build --release (crate-type staticlib). When absent,
+# loading falls back to the fig2json CLI.
+set(FIGMALIB_FIG2JSON_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.lib"
+    CACHE FILEPATH "Path to the fig2json static library (empty/missing → CLI fallback)")
+if(EXISTS "${FIGMALIB_FIG2JSON_LIB}")
+    target_compile_definitions(figmalib PRIVATE FIGMALIB_HAVE_FIG2JSON_LIB)
+    target_link_libraries(figmalib PUBLIC "${FIGMALIB_FIG2JSON_LIB}")
+    if(WIN32)
+        # Rust std dependencies.
+        target_link_libraries(figmalib PUBLIC ws2_32 userenv ntdll bcrypt advapi32)
+    endif()
+endif()
 target_include_directories(figmalib
     PUBLIC include "${THORVG_INCLUDE_DIR}"
     PRIVATE src third_party
@@ -83,6 +104,9 @@ if(FIGMALIB_BUILD_EXAMPLES)
     target_link_libraries(render_test PRIVATE figmalib)
     target_compile_definitions(render_test PRIVATE
         ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples/assets")
+
+    add_executable(layout_test examples/layout_test/main.cpp)
+    target_link_libraries(layout_test PRIVATE figmalib)
 endif()
 
 # ---- editor app ----

@@ -174,6 +174,127 @@ void parseTextStyle(const json& j, TextStyle& ts) {
     ts.maxLines = static_cast<int>(jfloat(s, "maxLines", 0));
 }
 
+Constraint parseConstraint(const std::string& v) {
+    // REST uses LEFT/TOP, RIGHT/BOTTOM, LEFT_RIGHT/TOP_BOTTOM.
+    if (v == "CENTER") return Constraint::Center;
+    if (v == "RIGHT" || v == "BOTTOM" || v == "MAX") return Constraint::Max;
+    if (v == "LEFT_RIGHT" || v == "TOP_BOTTOM" || v == "STRETCH") return Constraint::Stretch;
+    if (v == "SCALE") return Constraint::Scale;
+    return Constraint::Min;
+}
+
+AutoLayout::Align parseAlignItems(const std::string& v) {
+    if (v == "CENTER") return AutoLayout::Align::Center;
+    if (v == "MAX") return AutoLayout::Align::Max;
+    if (v == "SPACE_BETWEEN") return AutoLayout::Align::SpaceBetween;
+    if (v == "BASELINE") return AutoLayout::Align::Baseline;
+    return AutoLayout::Align::Min;
+}
+
+void parseLayout(const json& j, Node& node) {
+    if (auto it = j.find("constraints"); it != j.end() && it->is_object()) {
+        node.constraintH = parseConstraint(jstr(*it, "horizontal", "LEFT"));
+        node.constraintV = parseConstraint(jstr(*it, "vertical", "TOP"));
+    }
+
+    const std::string mode = jstr(j, "layoutMode", "NONE");
+    if (mode == "HORIZONTAL" || mode == "VERTICAL") {
+        AutoLayout& al = node.autoLayout;
+        al.mode = mode == "HORIZONTAL" ? AutoLayout::Mode::Horizontal
+                                       : AutoLayout::Mode::Vertical;
+        al.primarySizing = jstr(j, "primaryAxisSizingMode", "AUTO") == "FIXED"
+                               ? AutoLayout::Sizing::Fixed
+                               : AutoLayout::Sizing::Hug;
+        al.counterSizing = jstr(j, "counterAxisSizingMode", "AUTO") == "FIXED"
+                               ? AutoLayout::Sizing::Fixed
+                               : AutoLayout::Sizing::Hug;
+        al.primaryAlign = parseAlignItems(jstr(j, "primaryAxisAlignItems", "MIN"));
+        al.counterAlign = parseAlignItems(jstr(j, "counterAxisAlignItems", "MIN"));
+        al.paddingLeft = jfloat(j, "paddingLeft");
+        al.paddingRight = jfloat(j, "paddingRight");
+        al.paddingTop = jfloat(j, "paddingTop");
+        al.paddingBottom = jfloat(j, "paddingBottom");
+        al.itemSpacing = jfloat(j, "itemSpacing");
+        al.counterSpacing = jfloat(j, "counterAxisSpacing");
+        al.wrap = jstr(j, "layoutWrap", "NO_WRAP") == "WRAP";
+    }
+
+    node.layoutGrow = jfloat(j, "layoutGrow", 0);
+    node.layoutAlignStretch = jstr(j, "layoutAlign") == "STRETCH";
+    node.layoutAbsolute = jstr(j, "layoutPositioning") == "ABSOLUTE";
+    node.minWidth = jfloat(j, "minWidth");
+    node.maxWidth = jfloat(j, "maxWidth");
+    node.minHeight = jfloat(j, "minHeight");
+    node.maxHeight = jfloat(j, "maxHeight");
+}
+
+// REST rich text: characterStyleOverrides lists a style id per UTF-16 code
+// unit; styleOverrideTable maps ids to partial style objects. Mapped onto
+// UTF-8 byte ranges by walking codepoints.
+void parseTextRuns(const json& j, Node& node) {
+    auto so = j.find("characterStyleOverrides");
+    auto tbl = j.find("styleOverrideTable");
+    if (so == j.end() || !so->is_array() || so->empty() || tbl == j.end() || !tbl->is_object())
+        return;
+    auto idAt = [&](size_t i) -> int {
+        return i < so->size() && (*so)[i].is_number() ? (*so)[i].get<int>() : 0;
+    };
+
+    const std::string& s = node.characters;
+    std::vector<std::pair<size_t, int>> cps;  // (byte offset, style id)
+    size_t byte = 0, u16 = 0;
+    while (byte < s.size()) {
+        const unsigned char c = static_cast<unsigned char>(s[byte]);
+        const size_t len = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : 4;
+        cps.emplace_back(byte, idAt(u16));
+        byte += len;
+        u16 += len == 4 ? 2 : 1;
+    }
+
+    bool anyOverride = false;
+    std::vector<TextRun> runs;
+    for (size_t i = 0; i < cps.size();) {
+        const int id = cps[i].second;
+        size_t e = i + 1;
+        while (e < cps.size() && cps[e].second == id) ++e;
+        TextRun run;
+        run.start = static_cast<int>(cps[i].first);
+        run.end = static_cast<int>(e < cps.size() ? cps[e].first : s.size());
+        run.style = node.textStyle;
+        const json* ov = nullptr;
+        if (id != 0) {
+            if (auto it = tbl->find(std::to_string(id)); it != tbl->end() && it->is_object())
+                ov = &*it;
+        }
+        if (ov) {
+            const json& o = *ov;
+            run.style.fontFamily = jstr(o, "fontFamily", run.style.fontFamily);
+            run.style.fontSize = jfloat(o, "fontSize", run.style.fontSize);
+            if (o.contains("fontWeight") && o["fontWeight"].is_number())
+                run.style.fontWeight = static_cast<int>(o["fontWeight"].get<float>());
+            if (o.contains("italic") && o["italic"].is_boolean())
+                run.style.italic = o["italic"].get<bool>();
+            if (o.contains("letterSpacing") && o["letterSpacing"].is_number())
+                run.style.letterSpacing = o["letterSpacing"].get<float>();
+            if (auto f = o.find("fills"); f != o.end() && f->is_array()) {
+                for (const auto& pj : *f) {
+                    Paint p = parsePaint(pj);
+                    if (p.visible && p.type == PaintType::Solid) {
+                        Color c = p.color;
+                        c.a *= p.opacity;
+                        run.color = c;
+                        break;
+                    }
+                }
+            }
+            anyOverride = true;
+        }
+        runs.push_back(std::move(run));
+        i = e;
+    }
+    if (anyOverride && runs.size() > 1) node.textRuns = std::move(runs);
+}
+
 std::unique_ptr<Node> parseNode(const json& j, Node* parent) {
     auto node = std::make_unique<Node>();
     node->parent = parent;
@@ -217,6 +338,7 @@ std::unique_ptr<Node> parseNode(const json& j, Node* parent) {
     }
 
     node->clipsContent = jbool(j, "clipsContent", false);
+    parseLayout(j, *node);
 
     parsePaints(j, "fills", node->fills);
     parsePaints(j, "strokes", node->strokes);
@@ -246,7 +368,10 @@ std::unique_ptr<Node> parseNode(const json& j, Node* parent) {
     if (node->type == NodeType::Text) {
         node->characters = jstr(j, "characters");
         parseTextStyle(j, node->textStyle);
+        parseTextRuns(j, *node);
     }
+
+    if (node->type == NodeType::Instance) node->componentId = jstr(j, "componentId");
 
     // CANVAS pages have a background color exposed via "backgroundColor".
     if (node->type == NodeType::Canvas && node->fills.empty()) {
@@ -287,6 +412,7 @@ std::unique_ptr<Document> parseDocument(const std::string& jsonText) {
         throw std::runtime_error("figmalib: JSON has no \"document\" node");
     }
     doc->root = parseNode(*rootJson, nullptr);
+    doc->captureBaseLayout();
     return doc;
 }
 

@@ -85,6 +85,51 @@ json nodeJson(const Node& n) {
         {json::array({m.m00, m.m01, m.m02}), json::array({m.m10, m.m11, m.m12})});
     if (n.clipsContent) j["clipsContent"] = true;
 
+    auto constraintName = [](Constraint c, bool horizontal) {
+        switch (c) {
+        case Constraint::Center: return "CENTER";
+        case Constraint::Max: return horizontal ? "RIGHT" : "BOTTOM";
+        case Constraint::Stretch: return horizontal ? "LEFT_RIGHT" : "TOP_BOTTOM";
+        case Constraint::Scale: return "SCALE";
+        default: return horizontal ? "LEFT" : "TOP";
+        }
+    };
+    if (n.constraintH != Constraint::Min || n.constraintV != Constraint::Min) {
+        j["constraints"] = {{"horizontal", constraintName(n.constraintH, true)},
+                            {"vertical", constraintName(n.constraintV, false)}};
+    }
+    if (n.autoLayout.enabled()) {
+        const AutoLayout& al = n.autoLayout;
+        auto alignName = [](AutoLayout::Align a) {
+            switch (a) {
+            case AutoLayout::Align::Center: return "CENTER";
+            case AutoLayout::Align::Max: return "MAX";
+            case AutoLayout::Align::SpaceBetween: return "SPACE_BETWEEN";
+            case AutoLayout::Align::Baseline: return "BASELINE";
+            default: return "MIN";
+            }
+        };
+        j["layoutMode"] = al.mode == AutoLayout::Mode::Horizontal ? "HORIZONTAL" : "VERTICAL";
+        j["primaryAxisSizingMode"] = al.primarySizing == AutoLayout::Sizing::Fixed ? "FIXED" : "AUTO";
+        j["counterAxisSizingMode"] = al.counterSizing == AutoLayout::Sizing::Fixed ? "FIXED" : "AUTO";
+        if (al.primaryAlign != AutoLayout::Align::Min) j["primaryAxisAlignItems"] = alignName(al.primaryAlign);
+        if (al.counterAlign != AutoLayout::Align::Min) j["counterAxisAlignItems"] = alignName(al.counterAlign);
+        if (al.paddingLeft != 0) j["paddingLeft"] = al.paddingLeft;
+        if (al.paddingRight != 0) j["paddingRight"] = al.paddingRight;
+        if (al.paddingTop != 0) j["paddingTop"] = al.paddingTop;
+        if (al.paddingBottom != 0) j["paddingBottom"] = al.paddingBottom;
+        if (al.itemSpacing != 0) j["itemSpacing"] = al.itemSpacing;
+        if (al.counterSpacing != 0) j["counterAxisSpacing"] = al.counterSpacing;
+        if (al.wrap) j["layoutWrap"] = "WRAP";
+    }
+    if (n.layoutGrow != 0) j["layoutGrow"] = n.layoutGrow;
+    if (n.layoutAlignStretch) j["layoutAlign"] = "STRETCH";
+    if (n.layoutAbsolute) j["layoutPositioning"] = "ABSOLUTE";
+    if (n.minWidth > 0) j["minWidth"] = n.minWidth;
+    if (n.maxWidth > 0) j["maxWidth"] = n.maxWidth;
+    if (n.minHeight > 0) j["minHeight"] = n.minHeight;
+    if (n.maxHeight > 0) j["maxHeight"] = n.maxHeight;
+
     if (!n.fills.empty()) {
         json fills = json::array();
         for (const auto& p : n.fills) fills.push_back(paintJson(p));
@@ -163,6 +208,8 @@ json nodeJson(const Node& n) {
         if (ts.maxLines > 0) style["maxLines"] = ts.maxLines;
         j["style"] = std::move(style);
     }
+
+    if (!n.componentId.empty()) j["componentId"] = n.componentId;
 
     if (!n.children.empty()) {
         json kids = json::array();

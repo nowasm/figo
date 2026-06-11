@@ -141,6 +141,31 @@ struct PathGeometry {
     bool evenOdd = false;
 };
 
+// How a node follows its parent frame's edges when the frame resizes.
+// Min/Max = pin to left/top resp. right/bottom edge; Stretch = pin both edges;
+// Scale = position and size scale proportionally.
+enum class Constraint { Min, Center, Max, Stretch, Scale };
+
+// Auto-layout ("stack") container properties. REST: layoutMode/padding*/
+// itemSpacing/...; canvas.json (kiwi): stackMode/stackSpacing/stack*Padding/...
+struct AutoLayout {
+    enum class Mode { None, Horizontal, Vertical };
+    enum class Sizing { Fixed, Hug };  // Hug = size to content (REST "AUTO")
+    enum class Align { Min, Center, Max, SpaceBetween, Baseline };
+
+    Mode mode = Mode::None;
+    Sizing primarySizing = Sizing::Fixed;
+    Sizing counterSizing = Sizing::Fixed;
+    Align primaryAlign = Align::Min;    // children packing along the main axis
+    Align counterAlign = Align::Min;    // children alignment across the axis
+    float paddingLeft = 0, paddingRight = 0, paddingTop = 0, paddingBottom = 0;
+    float itemSpacing = 0;
+    float counterSpacing = 0;  // gap between wrapped rows/columns
+    bool wrap = false;
+
+    bool enabled() const { return mode != Mode::None; }
+};
+
 // Rich-text segment: [start, end) byte range of Node::characters with its own
 // style. Only produced for ASCII single-style-per-character documents; the
 // renderer falls back to the node's base style when it cannot honor a run.
@@ -150,7 +175,10 @@ struct TextRun {
     std::optional<Color> color;  // overrides the node's fill for this run
 };
 
-struct Node {
+// All value state of a node, split out so nodes can be cloned with a plain
+// member-wise copy (see cloneNode) — new fields added here are picked up by
+// clone/serialize automatically; only parent/children need special handling.
+struct NodeData {
     std::string id;
     std::string name;
     NodeType type = NodeType::Unknown;
@@ -184,13 +212,34 @@ struct Node {
     TextStyle textStyle;
     std::vector<TextRun> textRuns;  // empty → uniform style
 
-    Node* parent = nullptr;
-    std::vector<std::unique_ptr<Node>> children;
+    // Instances: id of the COMPONENT this instance was created from.
+    std::string componentId;
+
+    // ---- Layout (responsive reflow) ----
+    Constraint constraintH = Constraint::Min;
+    Constraint constraintV = Constraint::Min;
+    float minWidth = 0, maxWidth = 0;    // 0 = unconstrained
+    float minHeight = 0, maxHeight = 0;
+    AutoLayout autoLayout;            // container: auto-layout stack settings
+    float layoutGrow = 0;             // child: flex-grow along parent's main axis
+    bool layoutAlignStretch = false;  // child: stretch across parent's counter axis
+    bool layoutAbsolute = false;      // child: excluded from auto-layout flow
+
+    // Authored geometry, captured once after parsing. The layout engine
+    // restores from this snapshot before every reflow so repeated viewport
+    // resizes don't accumulate error.
+    Mat23 baseTransform;
+    float baseWidth = 0, baseHeight = 0;
 
     // ---- Runtime state (set by the renderer / UI layer) ----
     Mat23 absoluteTransform;        // computed during scene build
     float runtimeOpacity = -1.0f;   // override; <0 → use authored opacity
     int runtimeVisible = -1;        // -1 inherit, 0 hidden, 1 visible
+};
+
+struct Node : NodeData {
+    Node* parent = nullptr;
+    std::vector<std::unique_ptr<Node>> children;
 
     bool effectivelyVisible() const {
         return runtimeVisible < 0 ? visible : runtimeVisible != 0;
@@ -204,6 +253,9 @@ struct Node {
     void visit(const std::function<bool(Node&)>& fn);  // fn returns false to stop descent
 };
 
+// Deep copy of a subtree; the copy's parent is set to `parent` (may be null).
+std::unique_ptr<Node> cloneNode(const Node& src, Node* parent);
+
 struct Document {
     std::string name;
     std::unique_ptr<Node> root;  // DOCUMENT node; children are CANVAS pages
@@ -213,6 +265,11 @@ struct Document {
 
     // Top-level frames of every page, in document order.
     std::vector<Node*> topLevelFrames() const;
+
+    // Snapshot the current geometry of every node as the layout baseline
+    // (base{Transform,Width,Height}). The parsers call this once after
+    // loading; call it again after edits that should become the new baseline.
+    void captureBaseLayout();
 };
 
 }  // namespace figmalib

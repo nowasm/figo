@@ -45,4 +45,23 @@ std::vector<Node*> Document::topLevelFrames() const {
     return frames;
 }
 
+std::unique_ptr<Node> cloneNode(const Node& src, Node* parent) {
+    auto n = std::make_unique<Node>();
+    static_cast<NodeData&>(*n) = src;  // member-wise copy of all value state
+    n->parent = parent;
+    n->children.reserve(src.children.size());
+    for (const auto& c : src.children) n->children.push_back(cloneNode(*c, n.get()));
+    return n;
+}
+
+void Document::captureBaseLayout() {
+    if (!root) return;
+    root->visit([](Node& n) {
+        n.baseTransform = n.relativeTransform;
+        n.baseWidth = n.width;
+        n.baseHeight = n.height;
+        return true;
+    });
+}
+
 }  // namespace figmalib

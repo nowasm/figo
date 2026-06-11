@@ -915,6 +915,9 @@ NodeType inferCanvasNodeType(const json& j, int depth) {
             {"TEXT", NodeType::Text},           {"COMPONENT", NodeType::Component},
             {"COMPONENT_SET", NodeType::ComponentSet}, {"INSTANCE", NodeType::Instance},
             {"SLICE", NodeType::Slice},
+            // kiwi (.fig) names
+            {"SYMBOL", NodeType::Component},    {"STATE_GROUP", NodeType::ComponentSet},
+            {"ROUNDED_RECTANGLE", NodeType::Rectangle},
         };
         auto it = map.find(explicitType);
         if (it != map.end()) return it->second;
@@ -942,6 +945,72 @@ float firstPositive(std::initializer_list<float> values, float fallback) {
     return fallback;
 }
 
+Constraint parseKiwiConstraint(const std::string& v) {
+    if (v == "CENTER") return Constraint::Center;
+    if (v == "MAX") return Constraint::Max;
+    if (v == "STRETCH") return Constraint::Stretch;
+    if (v == "SCALE") return Constraint::Scale;
+    return Constraint::Min;
+}
+
+AutoLayout::Align parseKiwiAlignItems(const std::string& v) {
+    if (v == "CENTER") return AutoLayout::Align::Center;
+    if (v == "MAX") return AutoLayout::Align::Max;
+    // Figma's UI exposes only SPACE_BETWEEN; kiwi also has SPACE_EVENLY.
+    if (v == "SPACE_BETWEEN" || v == "SPACE_EVENLY") return AutoLayout::Align::SpaceBetween;
+    if (v == "BASELINE") return AutoLayout::Align::Baseline;
+    return AutoLayout::Align::Min;
+}
+
+// Layout fields from kiwi names (requires a fig2json build that keeps the
+// constraint/stack properties instead of stripping them).
+void parseKiwiLayout(const json& j, Node& node) {
+    node.constraintH = parseKiwiConstraint(jstr(j, "horizontalConstraint", "MIN"));
+    node.constraintV = parseKiwiConstraint(jstr(j, "verticalConstraint", "MIN"));
+
+    const std::string mode = jstr(j, "stackMode", "NONE");
+    if (mode == "HORIZONTAL" || mode == "VERTICAL") {
+        AutoLayout& al = node.autoLayout;
+        al.mode = mode == "HORIZONTAL" ? AutoLayout::Mode::Horizontal
+                                       : AutoLayout::Mode::Vertical;
+        // RESIZE_TO_FIT / RESIZE_TO_FIT_WITH_IMPLICIT_SIZE = hug content.
+        al.primarySizing = jstr(j, "stackPrimarySizing", "FIXED") == "FIXED"
+                               ? AutoLayout::Sizing::Fixed
+                               : AutoLayout::Sizing::Hug;
+        al.counterSizing = jstr(j, "stackCounterSizing", "FIXED") == "FIXED"
+                               ? AutoLayout::Sizing::Fixed
+                               : AutoLayout::Sizing::Hug;
+        al.primaryAlign = parseKiwiAlignItems(jstr(j, "stackPrimaryAlignItems", "MIN"));
+        al.counterAlign = parseKiwiAlignItems(jstr(j, "stackCounterAlignItems", "MIN"));
+        // stackHorizontalPadding/stackVerticalPadding are the LEFT/TOP values;
+        // right/bottom fall back to them when absent (symmetric padding).
+        al.paddingLeft = jfloat(j, "stackHorizontalPadding");
+        al.paddingTop = jfloat(j, "stackVerticalPadding");
+        al.paddingRight = jfloat(j, "stackPaddingRight", al.paddingLeft);
+        al.paddingBottom = jfloat(j, "stackPaddingBottom", al.paddingTop);
+        al.itemSpacing = jfloat(j, "stackSpacing");
+        al.counterSpacing = jfloat(j, "stackCounterSpacing");
+        al.wrap = jstr(j, "stackWrap", "NO_WRAP") == "WRAP";
+    }
+
+    node.layoutGrow = jfloat(j, "stackChildPrimaryGrow", 0);
+    node.layoutAlignStretch = jstr(j, "stackChildAlignSelf") == "STRETCH";
+    node.layoutAbsolute = jstr(j, "stackPositioning") == "ABSOLUTE";
+
+    // Min/max sizes arrive either as plain numbers or {"value": n} wrappers.
+    auto sizeLimit = [&](const char* key) -> float {
+        auto it = j.find(key);
+        if (it == j.end()) return 0;
+        if (it->is_number()) return it->get<float>();
+        if (it->is_object()) return jfloat(*it, "value");
+        return 0;
+    };
+    node.minWidth = sizeLimit("minWidth");
+    node.maxWidth = sizeLimit("maxWidth");
+    node.minHeight = sizeLimit("minHeight");
+    node.maxHeight = sizeLimit("maxHeight");
+}
+
 std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {
     auto node = std::make_unique<Node>();
     node->parent = parent;
@@ -961,6 +1030,17 @@ std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {
     // missing means "don't clip" (wrapper canvas/page nodes shouldn't clip).
     if (j.contains("frameMaskDisabled") && j["frameMaskDisabled"].is_boolean()) {
         node->clipsContent = !j["frameMaskDisabled"].get<bool>();
+    }
+
+    parseKiwiLayout(j, *node);
+
+    // Instance → master component link ("sessionID:localID", same key format
+    // as node ids and the components map).
+    if (auto sd = j.find("symbolData"); sd != j.end() && sd->is_object()) {
+        if (auto sid = sd->find("symbolID"); sid != sd->end() && sid->is_object()) {
+            node->componentId = symbolIDKey(*sid);
+            if (node->type == NodeType::Frame) node->type = NodeType::Instance;
+        }
     }
 
     parseCanvasPaints(j, "fillPaints", node->fills);
@@ -1077,14 +1157,11 @@ std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {
         ts.maxLines = static_cast<int>(jfloat(j, "maxLines", 0));
 
         // Rich-text runs: characterStyleIDs index styleOverrideTable entries
-        // (ID 0 = base style). Indices are per UTF-16 code unit; we only
-        // segment all-ASCII strings, where they coincide with byte offsets.
+        // (ID 0 = base style). Indices are per UTF-16 code unit; walk the
+        // UTF-8 string codepoint by codepoint to map them onto byte ranges.
         if (j.contains("textData") && j["textData"].is_object()) {
             const json& td = j["textData"];
-            const bool ascii = std::all_of(
-                node->characters.begin(), node->characters.end(),
-                [](char c) { return static_cast<unsigned char>(c) < 0x80; });
-            if (ascii && td.contains("characterStyleIDs") &&
+            if (td.contains("characterStyleIDs") &&
                 td["characterStyleIDs"].is_array() &&
                 td.contains("styleOverrideTable") && td["styleOverrideTable"].is_array()) {
                 std::unordered_map<int, const json*> table;
@@ -1096,16 +1173,27 @@ std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {
                 auto idAt = [&](size_t i) -> int {
                     return i < ids.size() && ids[i].is_number() ? ids[i].get<int>() : 0;
                 };
+                // Byte offset of each codepoint plus its style id (taken from
+                // the UTF-16 position of the codepoint's first code unit).
+                const std::string& s = node->characters;
+                std::vector<std::pair<size_t, int>> cps;  // (byte offset, style id)
+                size_t byte = 0, u16 = 0;
+                while (byte < s.size()) {
+                    const unsigned char c = static_cast<unsigned char>(s[byte]);
+                    const size_t n = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : 4;
+                    cps.emplace_back(byte, idAt(u16));
+                    byte += n;
+                    u16 += n == 4 ? 2 : 1;  // astral codepoints take a surrogate pair
+                }
                 bool anyOverride = false;
                 std::vector<TextRun> runs;
-                const size_t len = node->characters.size();
-                for (size_t i = 0; i < len;) {
-                    const int id = idAt(i);
+                for (size_t i = 0; i < cps.size();) {
+                    const int id = cps[i].second;
                     size_t e = i + 1;
-                    while (e < len && idAt(e) == id) ++e;
+                    while (e < cps.size() && cps[e].second == id) ++e;
                     TextRun run;
-                    run.start = static_cast<int>(i);
-                    run.end = static_cast<int>(e);
+                    run.start = static_cast<int>(cps[i].first);
+                    run.end = static_cast<int>(e < cps.size() ? cps[e].first : s.size());
                     run.style = ts;
                     const json* ov = id != 0 && table.count(id) ? table[id] : nullptr;
                     if (ov) {
@@ -1200,6 +1288,7 @@ std::unique_ptr<Document> parseCanvasDocument(const std::string& jsonText) {
     auto out = std::make_unique<Document>();
     out->name = jstr(root, "name", jstr(doc, "name", "Untitled"));
     out->root = parseCanvasNode(doc, nullptr, 0);
+    out->captureBaseLayout();
     return out;
 }
 

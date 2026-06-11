@@ -1,9 +1,12 @@
 #include "figmalib/ui.h"
 
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 #include <unordered_map>
 
+#include "figmalib/layout.h"
 #include "figmalib/parser.h"
 
 namespace figmalib {
@@ -14,8 +17,18 @@ struct FigmaUI::Impl {
     Node* frame = nullptr;
     Node* hovered = nullptr;
     Node* pressed = nullptr;
+    ResizeMode resizeMode = ResizeMode::Scale;
     std::unordered_map<std::string, std::vector<ClickHandler>> clickHandlers;
     std::unordered_map<std::string, std::vector<HoverHandler>> hoverHandlers;
+
+    // In Reflow mode the current frame tracks the viewport size.
+    void reflow() {
+        if (resizeMode != ResizeMode::Reflow || !frame) return;
+        const uint32_t w = renderer.width(), h = renderer.height();
+        if (w == 0 || h == 0) return;
+        layoutFrame(*frame, static_cast<float>(w), static_cast<float>(h));
+        renderer.markDirty();
+    }
 
     // Point in root-frame coordinates → deepest visible hit node.
     Node* hitTestFrame(Node& node, float fx, float fy) {
@@ -127,6 +140,7 @@ bool FigmaUI::selectFrame(const std::string& name) {
             impl_->renderer.setFrame(f);
             impl_->hovered = nullptr;
             impl_->pressed = nullptr;
+            impl_->reflow();
             return true;
         }
     }
@@ -135,8 +149,30 @@ bool FigmaUI::selectFrame(const std::string& name) {
 
 Node* FigmaUI::currentFrame() const { return impl_->frame; }
 
+void FigmaUI::setResizeMode(ResizeMode mode) {
+    if (impl_->resizeMode == mode) return;
+    impl_->resizeMode = mode;
+    if (mode == ResizeMode::Scale && impl_->frame) {
+        resetLayout(*impl_->frame);  // back to the authored geometry
+        impl_->renderer.markDirty();
+    } else {
+        impl_->reflow();
+    }
+}
+
+FigmaUI::ResizeMode FigmaUI::resizeMode() const { return impl_->resizeMode; }
+
 void FigmaUI::setViewport(uint32_t width, uint32_t height) {
+    const bool changed = width != impl_->renderer.width() || height != impl_->renderer.height();
     impl_->renderer.setTarget(width, height);
+    if (changed) impl_->reflow();
+}
+
+bool FigmaUI::setViewportGL(int32_t fboId, uint32_t width, uint32_t height) {
+    const bool changed = width != impl_->renderer.width() || height != impl_->renderer.height();
+    if (!impl_->renderer.setTargetGL(fboId, width, height)) return false;
+    if (changed) impl_->reflow();
+    return true;
 }
 
 bool FigmaUI::render() { return impl_->renderer.render(); }
@@ -224,6 +260,92 @@ bool FigmaUI::setText(const std::string& nodeName, const std::string& text) {
     Node* n = impl_->findMutable(nodeName);
     if (!n || n->type != NodeType::Text) return false;
     n->characters = text;
+    impl_->renderer.markDirty();
+    return true;
+}
+
+namespace {
+
+// "State=Hover, Size=Large" → {("state","hover"), ("size","large")}.
+// Keys and values compare case-insensitively, whitespace-trimmed.
+std::map<std::string, std::string> parseVariantName(const std::string& name) {
+    std::map<std::string, std::string> props;
+    auto normalize = [](std::string s) {
+        const auto b = s.find_first_not_of(" \t");
+        const auto e = s.find_last_not_of(" \t");
+        s = b == std::string::npos ? std::string() : s.substr(b, e - b + 1);
+        for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return s;
+    };
+    size_t pos = 0;
+    while (pos <= name.size()) {
+        const size_t comma = std::min(name.find(',', pos), name.size());
+        const std::string part = name.substr(pos, comma - pos);
+        if (const size_t eq = part.find('='); eq != std::string::npos) {
+            props[normalize(part.substr(0, eq))] = normalize(part.substr(eq + 1));
+        }
+        pos = comma + 1;
+    }
+    return props;
+}
+
+}  // namespace
+
+bool FigmaUI::setVariant(const std::string& instanceName, const std::string& property,
+                         const std::string& value) {
+    Node* inst = impl_->findMutable(instanceName);
+    if (!inst || inst->componentId.empty()) return false;
+    Document& doc = *impl_->doc;
+
+    Node* current = doc.findById(inst->componentId);
+    if (!current || !current->parent ||
+        current->parent->type != NodeType::ComponentSet) {
+        return false;
+    }
+    Node* set = current->parent;
+
+    // Desired property map: the current variant with one property replaced.
+    auto want = parseVariantName(current->name);
+    auto target_props = parseVariantName(property + "=" + value);
+    for (auto& kv : target_props) want[kv.first] = kv.second;
+
+    Node* target = nullptr;
+    for (auto& cand : set->children) {
+        if (cand->type != NodeType::Component) continue;
+        if (parseVariantName(cand->name) == want) {
+            target = cand.get();
+            break;
+        }
+    }
+    if (!target) return false;
+    if (target == current) return true;  // already in that state
+
+    // Swap in clones of the target variant's children, then reflow them from
+    // the component's authored size to this instance's authored size so the
+    // new subtree behaves exactly like a parse-time instance.
+    inst->children.clear();
+    for (const auto& c : target->children) inst->children.push_back(cloneNode(*c, inst));
+    inst->componentId = target->id;
+
+    const float instBaseW = inst->baseWidth, instBaseH = inst->baseHeight;
+    inst->baseWidth = target->baseWidth;
+    inst->baseHeight = target->baseHeight;
+    layoutFrame(*inst, instBaseW > 0 ? instBaseW : target->baseWidth,
+                instBaseH > 0 ? instBaseH : target->baseHeight);
+    inst->baseWidth = instBaseW;
+    inst->baseHeight = instBaseH;
+    for (auto& c : inst->children) {
+        c->visit([](Node& n) {
+            n.baseTransform = n.relativeTransform;
+            n.baseWidth = n.width;
+            n.baseHeight = n.height;
+            return true;
+        });
+    }
+
+    impl_->reflow();  // re-run viewport reflow when in Reflow mode
+    impl_->hovered = nullptr;
+    impl_->pressed = nullptr;
     impl_->renderer.markDirty();
     return true;
 }

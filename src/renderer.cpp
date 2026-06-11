@@ -27,7 +27,9 @@ void engineUnref() {
 }  // namespace
 
 struct Renderer::Impl {
-    std::unique_ptr<tvg::SwCanvas> canvas;
+    std::unique_ptr<tvg::Canvas> canvas;  // SwCanvas (CPU) or GlCanvas (GPU)
+    bool gpu = false;
+    int32_t fboId = 0;
     std::vector<uint32_t> buffer;
     uint32_t width = 0, height = 0;
     Node* frame = nullptr;
@@ -69,19 +71,57 @@ Renderer::~Renderer() {
 }
 
 bool Renderer::setTarget(uint32_t width, uint32_t height) {
-    if (width == 0 || height == 0 || !impl_->canvas) return false;
+    if (width == 0 || height == 0) return false;
+    if (impl_->gpu) {  // switch back to CPU: the scene dies with the canvas
+        impl_->canvas.reset(tvg::SwCanvas::gen());
+        impl_->rootScene = nullptr;
+        impl_->gpu = false;
+        impl_->targetValid = false;
+        impl_->dirty = true;
+    }
+    if (!impl_->canvas) return false;
     if (width == impl_->width && height == impl_->height && impl_->targetValid) return true;
 
     impl_->buffer.assign(static_cast<size_t>(width) * height, 0);
     impl_->width = width;
     impl_->height = height;
     // RGBA8888 straight alpha — matches common engine texture formats.
-    const auto res = impl_->canvas->target(impl_->buffer.data(), width, width, height,
-                                           tvg::ColorSpace::ABGR8888S);
+    const auto res = static_cast<tvg::SwCanvas*>(impl_->canvas.get())
+                         ->target(impl_->buffer.data(), width, width, height,
+                                  tvg::ColorSpace::ABGR8888S);
     impl_->targetValid = res == tvg::Result::Success;
     impl_->viewDirty = true;  // scene survives; only the raster target changed
     return impl_->targetValid;
 }
+
+bool Renderer::setTargetGL(int32_t fboId, uint32_t width, uint32_t height) {
+    if (width == 0 || height == 0) return false;
+    if (!impl_->gpu) {
+        auto* gl = tvg::GlCanvas::gen();
+        if (!gl) return false;  // ThorVG built without the GL engine
+        impl_->canvas.reset(gl);
+        impl_->rootScene = nullptr;
+        impl_->gpu = true;
+        impl_->targetValid = false;
+        impl_->dirty = true;
+    } else if (width == impl_->width && height == impl_->height &&
+               fboId == impl_->fboId && impl_->targetValid) {
+        return true;
+    }
+    impl_->buffer.clear();
+    impl_->width = width;
+    impl_->height = height;
+    impl_->fboId = fboId;
+    // No display/surface/context: the caller's GL context is already current.
+    const auto res = static_cast<tvg::GlCanvas*>(impl_->canvas.get())
+                         ->target(nullptr, nullptr, nullptr, fboId, width, height,
+                                  tvg::ColorSpace::ABGR8888S);
+    impl_->targetValid = res == tvg::Result::Success;
+    impl_->viewDirty = true;
+    return impl_->targetValid;
+}
+
+bool Renderer::isGpu() const { return impl_->gpu; }
 
 void Renderer::setFrame(Node* frame) {
     if (impl_->frame == frame) return;
@@ -146,7 +186,9 @@ bool Renderer::render() {
     return true;
 }
 
-const uint32_t* Renderer::pixels() const { return impl_->buffer.data(); }
+const uint32_t* Renderer::pixels() const {
+    return impl_->buffer.empty() ? nullptr : impl_->buffer.data();
+}
 uint32_t Renderer::width() const { return impl_->width; }
 uint32_t Renderer::height() const { return impl_->height; }
 Mat23 Renderer::contentTransform() const { return impl_->contentTransform(); }

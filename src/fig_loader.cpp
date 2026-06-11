@@ -19,6 +19,14 @@
 #define FIGMALIB_FIG2JSON_DEFAULT "fig2json"
 #endif
 
+#ifdef FIGMALIB_HAVE_FIG2JSON_LIB
+// In-process conversion via the fig2json static library (src/capi.rs).
+extern "C" {
+char* fig2json_convert_file(const char* figPath, const char* outDir, char** err);
+void fig2json_free(char* s);
+}
+#endif
+
 namespace figmalib {
 
 namespace fs = std::filesystem;
@@ -49,7 +57,8 @@ std::string fig2jsonExe() {
 }
 
 // Run "fig2json <fig> <outDir>". Results are cached: skip when canvas.json
-// already exists and is newer than the .fig.
+// already exists and is newer than both the .fig and the fig2json executable
+// (an upgraded converter may emit fields older caches are missing).
 fs::path convertFig(const fs::path& figPath) {
     const fs::path outDir = figPath.string() + ".export";
     const fs::path canvasJson = outDir / "canvas.json";
@@ -58,10 +67,33 @@ fs::path convertFig(const fs::path& figPath) {
     if (fs::exists(canvasJson, ec)) {
         const auto figTime = fs::last_write_time(figPath, ec);
         const auto jsonTime = fs::last_write_time(canvasJson, ec);
-        if (!ec && jsonTime >= figTime) return outDir;
+        bool fresh = !ec && jsonTime >= figTime;
+        if (fresh) {
+            std::error_code exeEc;
+            const fs::path exe = fig2jsonExe();
+            const auto exeTime = fs::last_write_time(exe, exeEc);
+            if (!exeEc && exeTime > jsonTime) fresh = false;
+        }
+        if (fresh) return outDir;
     }
 
     fs::create_directories(outDir, ec);
+
+#ifdef FIGMALIB_HAVE_FIG2JSON_LIB
+    // In-process conversion: writes canvas.json + images/ into outDir, same
+    // layout as the CLI. Falls through to the CLI only on failure.
+    {
+        char* err = nullptr;
+        char* json = fig2json_convert_file(figPath.string().c_str(),
+                                           outDir.string().c_str(), &err);
+        if (err) fig2json_free(err);
+        if (json) {
+            fig2json_free(json);
+            if (fs::exists(canvasJson, ec)) return outDir;
+        }
+    }
+#endif
+
     std::string cmd = "\"" + fig2jsonExe() + "\" \"" + figPath.string() + "\" \"" +
                       outDir.string() + "\"";
 #ifdef _WIN32

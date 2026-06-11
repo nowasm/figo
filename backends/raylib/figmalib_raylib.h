@@ -21,6 +21,13 @@ public:
     RaylibFigmaView(const RaylibFigmaView&) = delete;
     RaylibFigmaView& operator=(const RaylibFigmaView&) = delete;
 
+    // GPU mode: ThorVG's GL engine renders straight into a raylib
+    // RenderTexture (zero CPU pixel copy). Falls back to CPU rasterization
+    // automatically when the GL engine is unavailable. Returns the mode
+    // actually active.
+    bool setGpu(bool enabled);
+    bool gpu() const { return gpuActive_; }
+
     // Match the UI raster size to the given size (e.g. GetScreenWidth/Height).
     void resize(int width, int height);
 
@@ -32,12 +39,15 @@ public:
     // (::Color is raylib's — figmalib has its own Color type in this namespace.)
     void draw(int x = 0, int y = 0, ::Color tint = {255, 255, 255, 255}) const;
 
-    const Texture2D& texture() const { return texture_; }
+    const Texture2D& texture() const { return gpuActive_ ? rt_.texture : texture_; }
 
 private:
     FigmaUI& ui_;
     Texture2D texture_{};
     bool textureValid_ = false;
+    bool gpuWanted_ = false;
+    bool gpuActive_ = false;
+    RenderTexture2D rt_{};
 };
 
 }  // namespace figmalib

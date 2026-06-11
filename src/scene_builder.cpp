@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 
 #include "svg_path.h"
@@ -58,6 +59,46 @@ void cornerRadii(const Node& n, float& tl, float& tr, float& br, float& bl) {
     }
 }
 
+// Responsive layout can change a node's size away from the authored one, but
+// fillGeometry/strokeGeometry paths stay in authored local coordinates. This
+// reports the scale to apply to stored path data so it tracks the live size.
+void geometryScale(const Node& n, float& sx, float& sy) {
+    sx = (n.baseWidth > 0 && n.width != n.baseWidth) ? n.width / n.baseWidth : 1.0f;
+    sy = (n.baseHeight > 0 && n.height != n.baseHeight) ? n.height / n.baseHeight : 1.0f;
+}
+
+// Primitive-shaped nodes are regenerated from width/height when resized
+// (keeps corner radii crisp instead of stretching the stored path).
+bool regenerateAsPrimitive(const Node& n) {
+    if (n.width == n.baseWidth && n.height == n.baseHeight) return false;
+    switch (n.type) {
+    case NodeType::Rectangle:
+    case NodeType::Ellipse:
+    case NodeType::Line:
+    case NodeType::Frame:
+    case NodeType::Component:
+    case NodeType::Instance:
+    case NodeType::Section:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void appendPrimitive(tvg::Shape& shape, const Node& n);
+
+// Node outline in live coordinates: the stored fill geometry (scaled to the
+// current size) unless the node regenerates as a primitive.
+void appendOutline(tvg::Shape& shape, const Node& n) {
+    float gsx, gsy;
+    geometryScale(n, gsx, gsy);
+    if (!n.fillGeometry.empty() && !regenerateAsPrimitive(n)) {
+        for (const auto& geom : n.fillGeometry) appendSvgPath(shape, geom.path.c_str(), gsx, gsy);
+    } else {
+        appendPrimitive(shape, n);
+    }
+}
+
 // Appends the node's outline (primitive form) onto a shape.
 void appendPrimitive(tvg::Shape& shape, const Node& n) {
     switch (n.type) {
@@ -75,6 +116,85 @@ void appendPrimitive(tvg::Shape& shape, const Node& n) {
         break;
     }
     }
+}
+
+// Angular (conic) and diamond gradients have no ThorVG primitive. Rasterize
+// the gradient field into an RGBA buffer in the basis spanned by the Figma
+// handles (handle0 = center, handle1 = 0° axis, handle2 = 90° axis) and fill
+// the node with it as a picture; the caller clips it to the node outline.
+tvg::Picture* makeProceduralGradient(const Paint& p, const Node& n) {
+    if (p.stops.empty() || n.width < 1 || n.height < 1) return nullptr;
+
+    const float cx = p.handle0[0], cy = p.handle0[1];
+    const float ux = p.handle1[0] - cx, uy = p.handle1[1] - cy;
+    const float vx = p.handle2[0] - cx, vy = p.handle2[1] - cy;
+    const float det = ux * vy - vx * uy;
+    if (std::fabs(det) < 1e-6f) return nullptr;  // degenerate handles → radial fallback
+
+    // 256-entry color LUT over t ∈ [0,1] (straight alpha, memory order RGBA).
+    uint32_t lut[256];
+    {
+        auto pack = [&](const Color& c) {
+            const uint8_t a = static_cast<uint8_t>(channel(c.a) * p.opacity);
+            return static_cast<uint32_t>(channel(c.r)) |
+                   static_cast<uint32_t>(channel(c.g)) << 8 |
+                   static_cast<uint32_t>(channel(c.b)) << 16 | static_cast<uint32_t>(a) << 24;
+        };
+        size_t si = 0;
+        for (int i = 0; i < 256; ++i) {
+            const float t = i / 255.0f;
+            while (si + 1 < p.stops.size() && p.stops[si + 1].position < t) ++si;
+            if (t <= p.stops.front().position) {
+                lut[i] = pack(p.stops.front().color);
+            } else if (si + 1 >= p.stops.size() || t >= p.stops.back().position) {
+                lut[i] = pack(p.stops.back().color);
+            } else {
+                const auto& a = p.stops[si];
+                const auto& b = p.stops[si + 1];
+                const float span = b.position - a.position;
+                const float f = span > 0 ? (t - a.position) / span : 0;
+                Color c;
+                c.r = a.color.r + (b.color.r - a.color.r) * f;
+                c.g = a.color.g + (b.color.g - a.color.g) * f;
+                c.b = a.color.b + (b.color.b - a.color.b) * f;
+                c.a = a.color.a + (b.color.a - a.color.a) * f;
+                lut[i] = pack(c);
+            }
+        }
+    }
+
+    constexpr float kTau = 6.28318530717958647692f;
+    const uint32_t w = static_cast<uint32_t>(std::fmin(1024.0f, std::fmax(2.0f, n.width)));
+    const uint32_t h = static_cast<uint32_t>(std::fmin(1024.0f, std::fmax(2.0f, n.height)));
+    std::vector<uint32_t> buf(static_cast<size_t>(w) * h);
+    const bool angular = p.type == PaintType::GradientAngular;
+    for (uint32_t y = 0; y < h; ++y) {
+        const float py = (y + 0.5f) / h - cy;
+        for (uint32_t x = 0; x < w; ++x) {
+            const float px = (x + 0.5f) / w - cx;
+            // Coordinates in the handle basis.
+            const float u = (vy * px - vx * py) / det;
+            const float v = (-uy * px + ux * py) / det;
+            float t;
+            if (angular) {
+                t = std::atan2(v, u) / kTau;
+                t -= std::floor(t);
+            } else {
+                t = std::fmin(1.0f, std::fabs(u) + std::fabs(v));
+            }
+            buf[static_cast<size_t>(y) * w + x] =
+                lut[static_cast<int>(t * 255.0f + 0.5f)];
+        }
+    }
+
+    auto* pic = tvg::Picture::gen();
+    if (pic->load(buf.data(), w, h, tvg::ColorSpace::ABGR8888S, true /*copy*/) !=
+        tvg::Result::Success) {
+        tvg::Paint::rel(pic);
+        return nullptr;
+    }
+    pic->size(n.width, n.height);
+    return pic;
 }
 
 tvg::Fill* makeGradient(const Paint& p, float w, float h) {
@@ -187,10 +307,24 @@ void pushFillPaint(tvg::Scene& scene, const Paint& p, const Node& n,
         return;
     }
 
-    if (!n.fillGeometry.empty()) {
+    // Angular/diamond gradients: procedural raster clipped to the outline
+    // (no ThorVG primitive); on failure fall through to the radial fallback.
+    if (p.type == PaintType::GradientAngular || p.type == PaintType::GradientDiamond) {
+        if (auto* pic = makeProceduralGradient(p, n)) {
+            auto* clip = tvg::Shape::gen();
+            appendOutline(*clip, n);
+            pic->clip(clip);
+            scene.add(pic);
+            return;
+        }
+    }
+
+    if (!n.fillGeometry.empty() && !regenerateAsPrimitive(n)) {
+        float gsx, gsy;
+        geometryScale(n, gsx, gsy);
         for (const auto& geom : n.fillGeometry) {
             auto* shape = tvg::Shape::gen();
-            if (!appendSvgPath(*shape, geom.path.c_str())) {
+            if (!appendSvgPath(*shape, geom.path.c_str(), gsx, gsy)) {
                 tvg::Paint::rel(shape);
                 continue;
             }
@@ -209,7 +343,14 @@ void pushFillPaint(tvg::Scene& scene, const Paint& p, const Node& n,
 void pushStrokePaint(tvg::Scene& scene, const Paint& p, const Node& n) {
     if (!p.visible || p.opacity <= 0 || p.type == PaintType::Image) return;
 
-    if (!n.strokeGeometry.empty()) {
+    const bool resized = n.width != n.baseWidth || n.height != n.baseHeight;
+    float gsx, gsy;
+    geometryScale(n, gsx, gsy);
+
+    // Pre-outlined stroke paths bake the stroke width into the geometry, so
+    // scaling them would distort the weight — fall back to live stroking when
+    // the node was resized by layout.
+    if (!n.strokeGeometry.empty() && !resized) {
         // Figma pre-outlines strokes (handles inside/outside alignment); fill them.
         for (const auto& geom : n.strokeGeometry) {
             auto* shape = tvg::Shape::gen();
@@ -244,8 +385,9 @@ void pushStrokePaint(tvg::Scene& scene, const Paint& p, const Node& n) {
     // to the outline, OUTSIDE = double width with the outline masked away.
     auto outlineShape = [&]() {
         auto* s = tvg::Shape::gen();
-        if (!n.fillGeometry.empty()) {
-            for (const auto& geom : n.fillGeometry) appendSvgPath(*s, geom.path.c_str());
+        if (!n.fillGeometry.empty() && !regenerateAsPrimitive(n)) {
+            for (const auto& geom : n.fillGeometry)
+                appendSvgPath(*s, geom.path.c_str(), gsx, gsy);
         } else {
             appendPrimitive(*s, n);
         }
@@ -272,10 +414,10 @@ void pushStrokePaint(tvg::Scene& scene, const Paint& p, const Node& n) {
         scene.add(shape);
     };
 
-    if (!n.fillGeometry.empty()) {
+    if (!n.fillGeometry.empty() && !regenerateAsPrimitive(n)) {
         for (const auto& geom : n.fillGeometry) {
             auto* shape = tvg::Shape::gen();
-            if (!appendSvgPath(*shape, geom.path.c_str())) {
+            if (!appendSvgPath(*shape, geom.path.c_str(), gsx, gsy)) {
                 tvg::Paint::rel(shape);
                 continue;
             }
@@ -288,38 +430,68 @@ void pushStrokePaint(tvg::Scene& scene, const Paint& p, const Node& n) {
     }
 }
 
-// Sum of glyph advances for an ASCII string at the text's current font/size.
+// UTF-8 byte length of the codepoint starting at s[i].
+size_t cpLen(const std::string& s, size_t i) {
+    const unsigned char c = static_cast<unsigned char>(s[i]);
+    return c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : 4;
+}
+
+// Sum of glyph advances for a UTF-8 string at the text's current font/size.
 // Unlike ink bounds, this keeps trailing-space widths, which matters when
 // laying rich-text runs end to end.
 float measureAdvance(tvg::Text& text, const std::string& s, int& glyphs) {
     float total = 0;
     glyphs = 0;
-    char one[2] = {0, 0};
-    for (const char c : s) {
-        if (static_cast<unsigned char>(c) >= 0x80) continue;
-        one[0] = c;
+    char one[5] = {0};
+    for (size_t i = 0; i < s.size();) {
+        const size_t len = std::min(cpLen(s, i), s.size() - i);
+        if (s[i] == '\n') {
+            ++i;
+            continue;
+        }
+        std::memcpy(one, s.data() + i, len);
+        one[len] = 0;
         tvg::GlyphMetrics gm{};
         if (text.metrics(one, gm) == tvg::Result::Success && gm.advance > 0) {
             total += gm.advance;
             ++glyphs;
         }
+        i += len;
     }
     return total;
 }
 
-// Multi-style rich text, MVP scope: single-line, uniform font size. Runs are
-// rendered as separate Text paints laid end to end by advance width. Returns
-// nullptr when the node is out of scope — caller falls back to base style.
+// Picks a font key able to render `s`: the requested key unless a non-ASCII
+// codepoint has no glyph in it and a system fallback covers that codepoint —
+// then the whole string switches to the fallback (which also carries Latin).
+std::string keyForText(BuildContext& ctx, const std::string& key, const std::string& s,
+                       int weight, bool italic) {
+    for (size_t i = 0; i < s.size();) {
+        const size_t len = std::min(cpLen(s, i), s.size() - i);
+        if (len > 1) {
+            unsigned long cp = static_cast<unsigned char>(s[i]) &
+                               (len == 2 ? 0x1F : len == 3 ? 0x0F : 0x07);
+            for (size_t k = 1; k < len; ++k)
+                cp = (cp << 6) | (static_cast<unsigned char>(s[i + k]) & 0x3F);
+            if (!ctx.fonts->hasGlyph(key, cp)) {
+                const std::string fb = ctx.fonts->fallbackFontFor(cp, weight, italic);
+                if (!fb.empty()) return fb;
+                return key;
+            }
+        }
+        i += len;
+    }
+    return key;
+}
+
+// Multi-style rich text. Runs are tokenized into wrap-atomic pieces (words,
+// space gaps, individual CJK characters), greedily flowed into lines (an
+// explicit \n forces a break), and rendered as one tvg::Text per piece with
+// baselines aligned per line. Returns nullptr when a font is missing —
+// caller falls back to the uniform base-style path.
 tvg::Paint* makeRichText(const Node& n, BuildContext& ctx) {
     if (n.textRuns.empty() || !ctx.fonts) return nullptr;
     const TextStyle& base = n.textStyle;
-    if (n.characters.find('\n') != std::string::npos) return nullptr;
-    for (const auto& run : n.textRuns) {
-        if (run.style.fontSize != base.fontSize) return nullptr;
-    }
-    const float lineH = base.lineHeightPx > 0 ? base.lineHeightPx : base.fontSize * 1.2f;
-    // Multi-line boxes need wrap-aware run layout — out of MVP scope.
-    if (n.height >= lineH * 1.9f && base.autoResize != "WIDTH_AND_HEIGHT") return nullptr;
 
     // Node-level fill as the default run color.
     Color baseColor{0, 0, 0, 1};
@@ -332,9 +504,10 @@ tvg::Paint* makeRichText(const Node& n, BuildContext& ctx) {
     }
 
     struct Piece {
-        tvg::Text* text;   // null → whitespace-only run (advance only)
-        float width;       // full run advance, including surrounding spaces
-        float leadOffset;  // advance of stripped leading spaces
+        tvg::Text* text = nullptr;  // null → spaces (advance only) or newline
+        float width = 0;
+        float ascent = 0, fontH = 0, natLineH = 0;
+        bool space = false, newline = false;
     };
     std::vector<Piece> pieces;
     auto bail = [&]() -> tvg::Paint* {
@@ -342,7 +515,21 @@ tvg::Paint* makeRichText(const Node& n, BuildContext& ctx) {
         return nullptr;
     };
 
-    float fontH = 0;
+    // CJK and fullwidth ranges break per character.
+    auto cjk = [](unsigned long cp) {
+        return (cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) ||
+               (cp >= 0xFF00 && cp <= 0xFFEF) || (cp >= 0x20000 && cp <= 0x3FFFF);
+    };
+    auto decode = [](const std::string& s, size_t i, size_t len) -> unsigned long {
+        unsigned long cp = static_cast<unsigned char>(s[i]);
+        if (len == 2) cp &= 0x1F;
+        else if (len == 3) cp &= 0x0F;
+        else if (len == 4) cp &= 0x07;
+        for (size_t k = 1; k < len; ++k) cp = (cp << 6) | (static_cast<unsigned char>(s[i + k]) & 0x3F);
+        return cp;
+    };
+
+    // Tokenize each run and measure every token with its own styled Text.
     for (const auto& run : n.textRuns) {
         const std::string s =
             n.characters.substr(run.start, static_cast<size_t>(run.end - run.start));
@@ -350,74 +537,171 @@ tvg::Paint* makeRichText(const Node& n, BuildContext& ctx) {
         const std::string key = ctx.fonts->fontKeyFor(run.style.fontFamily,
                                                       run.style.fontWeight, run.style.italic);
         if (key.empty()) return bail();
-        auto* t = tvg::Text::gen();
-        if (t->font(key.c_str()) != tvg::Result::Success) {
-            tvg::Paint::rel(t);
-            return bail();
-        }
-        t->size(run.style.fontSize * 72.0f / 96.0f);
-        // ThorVG mispositions glyphs after a leading space (kerning against
-        // the empty glyph) — strip surrounding spaces from the rendered text
-        // and keep their advance in the piece width for x stepping.
-        const size_t lead = s.find_first_not_of(' ');
-        const std::string trimmed =
-            lead == std::string::npos ? std::string()
-                                      : s.substr(lead, s.find_last_not_of(' ') - lead + 1);
-        t->text(trimmed.c_str());
-        if (run.style.italic) t->italic();
 
-        tvg::TextMetrics m{};
-        if (fontH <= 0 && t->metrics(m) == tvg::Result::Success) fontH = m.ascent - m.descent;
+        auto makeToken = [&](const std::string& token, bool isSpace) -> bool {
+            const std::string tokenKey =
+                keyForText(ctx, key, token, run.style.fontWeight, run.style.italic);
+            auto* t = tvg::Text::gen();
+            if (t->font(tokenKey.c_str()) != tvg::Result::Success) {
+                tvg::Paint::rel(t);
+                return false;
+            }
+            t->size(run.style.fontSize * 72.0f / 96.0f);
+            t->text(token.c_str());
+            if (run.style.italic) t->italic();
 
-        int glyphs = 0;
-        float width = measureAdvance(*t, s, glyphs);  // full run incl. spaces
-        int leadGlyphs = 0;
-        const float leadWidth =
-            lead == std::string::npos || lead == 0
-                ? 0.0f
-                : measureAdvance(*t, s.substr(0, lead), leadGlyphs);
-        if (glyphs == 0) {
-            tvg::Paint::rel(t);
-            return bail();
-        }
-        float letterFactor = 1.0f;
-        if (run.style.letterSpacing != 0 && glyphs > 0) {
-            letterFactor = std::fmax(
-                0.0f, 1.0f + run.style.letterSpacing / (width / static_cast<float>(glyphs)));
-            t->spacing(letterFactor, 1.0f);
-        }
-        width *= letterFactor;
+            tvg::TextMetrics m{};
+            Piece p;
+            if (t->metrics(m) == tvg::Result::Success) {
+                p.ascent = m.ascent;
+                p.fontH = m.ascent - m.descent;
+                p.natLineH = m.advance > 0 ? m.advance : p.fontH;
+            }
+            int glyphs = 0;
+            float width = measureAdvance(*t, token, glyphs);
+            float letterFactor = 1.0f;
+            if (run.style.letterSpacing != 0 && glyphs > 0 && width > 0) {
+                letterFactor = std::fmax(
+                    0.0f,
+                    1.0f + run.style.letterSpacing / (width / static_cast<float>(glyphs)));
+                t->spacing(letterFactor, 1.0f);
+            }
+            p.width = width * letterFactor;
+            p.space = isSpace;
+            if (isSpace) {
+                tvg::Paint::rel(t);  // spaces only contribute advance
+            } else {
+                if (glyphs == 0) {
+                    tvg::Paint::rel(t);
+                    return false;
+                }
+                const Color c = run.color ? *run.color : baseColor;
+                t->fill(channel(c.r), channel(c.g), channel(c.b));
+                t->opacity(channel(c.a));
+                p.text = t;
+            }
+            pieces.push_back(p);
+            return true;
+        };
 
-        const Color c = run.color ? *run.color : baseColor;
-        t->fill(channel(c.r), channel(c.g), channel(c.b));
-        t->opacity(channel(c.a));
-        if (trimmed.empty()) {
-            tvg::Paint::rel(t);
-            t = nullptr;
+        size_t i = 0;
+        while (i < s.size()) {
+            const char c = s[i];
+            if (c == '\n') {
+                Piece nl;
+                nl.newline = true;
+                pieces.push_back(nl);
+                ++i;
+                continue;
+            }
+            if (c == ' ') {
+                size_t e = i;
+                while (e < s.size() && s[e] == ' ') ++e;
+                if (!makeToken(s.substr(i, e - i), true)) return bail();
+                i = e;
+                continue;
+            }
+            const size_t len = std::min(cpLen(s, i), s.size() - i);
+            const unsigned long cp = decode(s, i, len);
+            if (cjk(cp)) {
+                if (!makeToken(s.substr(i, len), false)) return bail();
+                i += len;
+                continue;
+            }
+            // Word: consume until space, newline, or CJK.
+            size_t e = i;
+            while (e < s.size() && s[e] != ' ' && s[e] != '\n') {
+                const size_t l = std::min(cpLen(s, e), s.size() - e);
+                if (cjk(decode(s, e, l))) break;
+                e += l;
+            }
+            if (!makeToken(s.substr(i, e - i), false)) return bail();
+            i = e;
         }
-        pieces.push_back({t, width, leadWidth * letterFactor});
     }
     if (pieces.empty()) return nullptr;
 
-    float total = 0;
-    for (const auto& p : pieces) total += p.width;
-    float x = base.alignH == TextStyle::AlignH::Center  ? (n.width - total) * 0.5f
-              : base.alignH == TextStyle::AlignH::Right ? n.width - total
-                                                        : 0.0f;
-    // Same line-box vertical model as the uniform-style path.
+    // Greedy line flow. Auto-width boxes never wrap (they hug their text).
+    const bool noWrap = base.autoResize == "WIDTH_AND_HEIGHT" || n.width <= 0;
+    const float maxW = noWrap ? 0 : n.width;
+    struct Line {
+        std::vector<Piece*> ps;
+        float width = 0;
+    };
+    std::vector<Line> lines(1);
+    auto lineEnd = [&](Line& ln) {  // drop trailing spaces from the extent
+        while (!ln.ps.empty() && ln.ps.back()->space) {
+            ln.width -= ln.ps.back()->width;
+            ln.ps.pop_back();
+        }
+    };
+    bool wrapped = false;  // last break was a wrap (drop the leading spaces)
+    for (auto& p : pieces) {
+        Line* cur = &lines.back();
+        if (p.newline) {
+            lineEnd(*cur);
+            lines.emplace_back();
+            wrapped = false;
+            continue;
+        }
+        if (p.space) {
+            if (wrapped && cur->ps.empty()) continue;
+            cur->ps.push_back(&p);
+            cur->width += p.width;
+            continue;
+        }
+        if (maxW > 0 && !cur->ps.empty() && cur->width + p.width > maxW + 0.5f) {
+            lineEnd(*cur);
+            lines.emplace_back();
+            cur = &lines.back();
+            wrapped = true;
+        }
+        cur->ps.push_back(&p);
+        cur->width += p.width;
+    }
+    lineEnd(lines.back());
+
+    // Vertical layout: Figma's line-box model. With an explicit lineHeight
+    // every line box has that height; otherwise each line uses the largest
+    // natural line advance it contains.
+    std::vector<float> lineHs(lines.size());
+    float contentH = 0;
+    for (size_t li = 0; li < lines.size(); ++li) {
+        float nat = base.fontSize * 1.2f;
+        for (Piece* p : lines[li].ps) nat = std::fmax(nat, p->natLineH);
+        lineHs[li] = base.lineHeightPx > 0 ? base.lineHeightPx : nat;
+        contentH += lineHs[li];
+    }
     float top = 0;
-    if (base.alignV == TextStyle::AlignV::Center) top = (n.height - lineH) * 0.5f;
-    else if (base.alignV == TextStyle::AlignV::Bottom) top = n.height - lineH;
-    const float ty = top + (lineH - fontH) * 0.5f;
+    if (base.alignV == TextStyle::AlignV::Center) top = (n.height - contentH) * 0.5f;
+    else if (base.alignV == TextStyle::AlignV::Bottom) top = n.height - contentH;
 
     auto* scene = tvg::Scene::gen();
-    for (auto& p : pieces) {
-        if (p.text) {
-            p.text->translate(x + p.leadOffset, ty);
-            scene->add(p.text);
+    for (size_t li = 0; li < lines.size(); ++li) {
+        const Line& ln = lines[li];
+        if (!ln.ps.empty()) {
+            float maxAscent = 0, maxFontH = 0;
+            for (Piece* p : ln.ps) {
+                maxAscent = std::fmax(maxAscent, p->ascent);
+                maxFontH = std::fmax(maxFontH, p->fontH);
+            }
+            const float baselineY = top + (lineHs[li] - maxFontH) * 0.5f + maxAscent;
+            float x = base.alignH == TextStyle::AlignH::Center  ? (n.width - ln.width) * 0.5f
+                      : base.alignH == TextStyle::AlignH::Right ? n.width - ln.width
+                                                                : 0.0f;
+            for (Piece* p : ln.ps) {
+                if (p->text) {
+                    p->text->translate(x, baselineY - p->ascent);
+                    scene->add(p->text);
+                    p->text = nullptr;  // owned by the scene now
+                }
+                x += p->width;
+            }
         }
-        x += p.width;
+        top += lineHs[li];
     }
+    // Release any pieces that never made it into the scene (trailing spaces).
+    for (auto& p : pieces) tvg::Paint::rel(p.text);
     return scene;
 }
 
@@ -425,8 +709,9 @@ tvg::Text* makeText(const Node& n, BuildContext& ctx) {
     if (n.characters.empty() || !ctx.fonts) return nullptr;
 
     const TextStyle& ts = n.textStyle;
-    const std::string key = ctx.fonts->fontKeyFor(ts.fontFamily, ts.fontWeight, ts.italic);
+    std::string key = ctx.fonts->fontKeyFor(ts.fontFamily, ts.fontWeight, ts.italic);
     if (key.empty()) return nullptr;
+    key = keyForText(ctx, key, n.characters, ts.fontWeight, ts.italic);
 
     auto* text = tvg::Text::gen();
     if (text->font(key.c_str()) != tvg::Result::Success) {
@@ -523,6 +808,43 @@ tvg::Text* makeText(const Node& n, BuildContext& ctx) {
     return text;
 }
 
+// INNER_SHADOW has no ThorVG counterpart: emulate it with the blurred
+// inverse of the node outline (a padded rect minus the outline, even-odd
+// fill), offset and clipped back to the outline. Drawn above fills and
+// children, matching Figma. The spread parameter is not reproduced.
+void addInnerShadows(tvg::Scene& scene, const Node& n) {
+    for (const auto& fx : n.effects) {
+        if (fx.type != Effect::Type::InnerShadow || !fx.visible) continue;
+        if (n.width <= 0 || n.height <= 0) continue;
+
+        const float pad =
+            fx.radius * 2.0f + std::fabs(fx.offsetX) + std::fabs(fx.offsetY) + 8.0f;
+        auto* inv = tvg::Shape::gen();
+        inv->appendRect(-pad, -pad, n.width + 2 * pad, n.height + 2 * pad);
+        appendOutline(*inv, n);
+        inv->fillRule(tvg::FillRule::EvenOdd);  // outline becomes a hole
+        inv->fill(channel(fx.color.r), channel(fx.color.g), channel(fx.color.b),
+                  channel(fx.color.a));
+        inv->translate(fx.offsetX, fx.offsetY);
+
+        auto* blurred = tvg::Scene::gen();
+        blurred->add(inv);
+        if (fx.radius > 0) {
+            blurred->add(tvg::SceneEffect::GaussianBlur,
+                         static_cast<double>(std::fmax(fx.radius * 0.5f, 0.01f)), 0, 0, 90);
+        }
+        // Confine the shadow with an alpha MASK, not a clip: ThorVG pushes
+        // clips down to shape rasterization (before scene post-effects), so
+        // a clipped blur would bleed outside the outline. Masks composite
+        // after the scene's effects.
+        auto* mask = tvg::Shape::gen();
+        appendOutline(*mask, n);
+        mask->fill(255, 255, 255, 255);
+        blurred->mask(mask, tvg::MaskMethod::Alpha);
+        scene.add(blurred);
+    }
+}
+
 void applyEffects(tvg::Scene& scene, const Node& n) {
     for (const auto& fx : n.effects) {
         if (!fx.visible) continue;
@@ -542,7 +864,7 @@ void applyEffects(tvg::Scene& scene, const Node& n) {
                       static_cast<double>(std::fmax(fx.radius * 0.5f, 0.01f)), 0, 0, 90);
             break;
         default:
-            break;  // InnerShadow / BackgroundBlur: not supported yet
+            break;  // InnerShadow → addInnerShadows; BackgroundBlur unsupported
         }
     }
 }
@@ -643,6 +965,8 @@ tvg::Scene* buildNodeScene(Node& node, const Mat23& parentAbs, BuildContext& ctx
             if (auto* cs = buildNodeScene(*child, node.absoluteTransform, ctx)) scene->add(cs);
         }
     }
+
+    addInnerShadows(*scene, node);
 
     if (node.clipsContent && node.width > 0 && node.height > 0) {
         auto* clip = tvg::Shape::gen();

@@ -105,6 +105,34 @@ int main(int argc, char** argv) {
         }
     }
 
+    // Responsive reflow: render the first frame at a different aspect ratio
+    // with constraints/auto-layout active instead of scale-to-fit.
+    if (!seen.empty() && ui->selectFrame(seen.front())) {
+        ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Reflow);
+        ui->setViewport(1280, 720);
+        if (!ui->render()) {
+            std::printf("FAIL: reflow render produced no pixels\n");
+            ++failures;
+        } else {
+            const uint32_t* px = ui->pixels();
+            const uint32_t total = ui->pixelWidth() * ui->pixelHeight();
+            uint32_t opaque = 0;
+            for (uint32_t i = 0; i < total; ++i) {
+                if (reinterpret_cast<const uint8_t*>(&px[i])[3] > 8) ++opaque;
+            }
+            writeBmp("render_reflow.bmp", px, ui->pixelWidth(), ui->pixelHeight());
+            std::printf("reflow %s: %ux%u, %.1f%% painted -> render_reflow.bmp\n",
+                        seen.front().c_str(), ui->pixelWidth(), ui->pixelHeight(),
+                        100.0 * opaque / total);
+            if (opaque < total / 10) {
+                std::printf("FAIL: reflow render mostly empty\n");
+                ++failures;
+            }
+        }
+        ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Scale);
+        ui->setViewport(900, 640);
+    }
+
     // Hit-test sanity on the sample UI: center of the start button.
     if (ui->selectFrame("MainMenu")) {
         ui->render();

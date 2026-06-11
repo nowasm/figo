@@ -34,7 +34,19 @@ public:
     Node* currentFrame() const;
 
     // ---- Render ----
+    // How the frame follows the viewport size:
+    //   Scale  — uniform scale-to-fit, letterboxed (default; authored layout)
+    //   Reflow — responsive: the frame resizes to the viewport and children
+    //            follow their Figma constraints / auto-layout
+    enum class ResizeMode { Scale, Reflow };
+    void setResizeMode(ResizeMode mode);
+    ResizeMode resizeMode() const;
+
     void setViewport(uint32_t width, uint32_t height);
+    // GPU variant: render into a GL framebuffer object via ThorVG's GL
+    // engine (zero CPU copy). Requires a current GL context; returns false
+    // when the GL engine is unavailable (caller falls back to setViewport).
+    bool setViewportGL(int32_t fboId, uint32_t width, uint32_t height);
     bool render();  // true → pixel buffer changed, re-upload texture
     const uint32_t* pixels() const;
     uint32_t pixelWidth() const;
@@ -60,6 +72,14 @@ public:
     bool setVisible(const std::string& nodeName, bool visible);
     bool setOpacity(const std::string& nodeName, float opacity);  // <0 resets to authored
     bool setText(const std::string& nodeName, const std::string& text);
+
+    // Switch an INSTANCE to a sibling variant of its component set, e.g.
+    // setVariant("btn-start", "State", "Hover") finds the variant whose name
+    // matches the instance's current properties with State replaced. The
+    // component set must be present in the document. Fails (false) when the
+    // instance, its set, or the target variant can't be resolved.
+    bool setVariant(const std::string& instanceName, const std::string& property,
+                    const std::string& value);
 
 private:
     FigmaUI();

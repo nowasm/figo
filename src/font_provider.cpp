@@ -78,14 +78,24 @@ std::vector<SystemFont> enumerateSystemFonts() {
             if (pos != std::string::npos) display.resize(pos);
         }
         std::string file(reinterpret_cast<char*>(data));
-        // ThorVG's loader handles .ttf/.otf; skip collections and bitmap fonts.
+        // ThorVG's loader handles .ttf/.otf; .ttc collections are unpacked
+        // into standalone faces at load time (see extractTtcFace).
         const std::string lowerFile = toLower(file);
         if (lowerFile.size() < 4) continue;
         const std::string ext = lowerFile.substr(lowerFile.size() - 4);
-        if (ext != ".ttf" && ext != ".otf") continue;
+        if (ext != ".ttf" && ext != ".otf" && ext != ".ttc") continue;
 
         std::string path = file.find(':') != std::string::npos ? file : fontDir + file;
-        fonts.push_back({display, path});
+        // Collection registry entries list every face joined by " & "
+        // (e.g. "Microsoft YaHei & Microsoft YaHei UI"): one entry per face.
+        size_t start = 0;
+        while (start < display.size()) {
+            size_t amp = display.find(" & ", start);
+            if (amp == std::string::npos) amp = display.size();
+            const std::string one = display.substr(start, amp - start);
+            if (!one.empty()) fonts.push_back({one, path});
+            start = amp + 3;
+        }
     }
     RegCloseKey(key);
     return fonts;
@@ -111,17 +121,19 @@ uint32_t be32(const uint8_t* p) {
            static_cast<uint32_t>(p[2]) << 8 | p[3];
 }
 
-bool parseSfnt(const std::vector<uint8_t>& d, SfntInfo& out) {
-    if (d.size() < 12) return false;
-    const uint32_t tag = be32(d.data());
+// `dirOff` points at the sfnt table directory: 0 for standalone fonts, the
+// per-face offset for faces inside a .ttc (table offsets stay file-absolute).
+bool parseSfnt(const std::vector<uint8_t>& d, SfntInfo& out, uint32_t dirOff = 0) {
+    if (d.size() < dirOff + 12) return false;
+    const uint32_t tag = be32(d.data() + dirOff);
     if (tag != 0x00010000 && tag != 0x4F54544F /*OTTO*/ && tag != 0x74727565 /*true*/)
         return false;
-    const uint16_t numTables = be16(d.data() + 4);
-    if (d.size() < 12 + numTables * 16u) return false;
+    const uint16_t numTables = be16(d.data() + dirOff + 4);
+    if (d.size() < dirOff + 12 + numTables * 16u) return false;
 
     uint32_t nameOff = 0, nameLen = 0, os2Off = 0, os2Len = 0;
     for (uint16_t i = 0; i < numTables; ++i) {
-        const uint8_t* rec = d.data() + 12 + i * 16;
+        const uint8_t* rec = d.data() + dirOff + 12 + i * 16;
         const uint32_t t = be32(rec);
         const uint32_t off = be32(rec + 8), len = be32(rec + 12);
         if (t == 0x6E616D65) { nameOff = off; nameLen = len; }        // 'name'
@@ -169,6 +181,125 @@ bool parseSfnt(const std::vector<uint8_t>& d, SfntInfo& out) {
     return !out.family.empty();
 }
 
+// ---- cmap coverage ----------------------------------------------------------
+// Codepoint ranges a font actually maps to glyphs, read from cmap format 12
+// (preferred) or format 4. Used for glyph-level font fallback: TTF renderers
+// happily draw .notdef boxes, so coverage must be checked up front.
+
+std::vector<std::pair<uint32_t, uint32_t>> parseCmapRanges(const std::vector<uint8_t>& d) {
+    std::vector<std::pair<uint32_t, uint32_t>> out;
+    if (d.size() < 12) return out;
+    const uint16_t numTables = be16(d.data() + 4);
+    if (d.size() < 12 + numTables * 16u) return out;
+    uint32_t cmapOff = 0, cmapLen = 0;
+    for (uint16_t i = 0; i < numTables; ++i) {
+        const uint8_t* rec = d.data() + 12 + i * 16;
+        if (be32(rec) == 0x636D6170) {  // 'cmap'
+            cmapOff = be32(rec + 8);
+            cmapLen = be32(rec + 12);
+            break;
+        }
+    }
+    if (!cmapOff || cmapLen < 4 || cmapOff > d.size() || cmapLen > d.size() - cmapOff) return out;
+    const uint8_t* c = d.data() + cmapOff;
+
+    const uint16_t n = be16(c + 2);
+    uint32_t best = 0;
+    int bestScore = -1;
+    for (uint16_t i = 0; i < n && 4 + (i + 1) * 8u <= cmapLen; ++i) {
+        const uint8_t* rec = c + 4 + i * 8;
+        const uint16_t pid = be16(rec), eid = be16(rec + 2);
+        const uint32_t off = be32(rec + 4);
+        if (off + 4 > cmapLen) continue;
+        int score = -1;
+        if (pid == 3 && eid == 10) score = 5;       // Windows, full Unicode
+        else if (pid == 0 && eid >= 4) score = 4;   // Unicode, full repertoire
+        else if (pid == 3 && eid == 1) score = 3;   // Windows, BMP
+        else if (pid == 0) score = 2;
+        if (score > bestScore) {
+            bestScore = score;
+            best = off;
+        }
+    }
+    if (bestScore < 0) return out;
+
+    const uint8_t* sub = c + best;
+    const uint32_t subAvail = cmapLen - best;
+    const uint16_t format = be16(sub);
+    if (format == 4 && subAvail >= 14) {
+        const uint16_t segX2 = be16(sub + 6);
+        if (14u + segX2 * 2u + 2u + segX2 <= subAvail) {
+            const uint8_t* endCodes = sub + 14;
+            const uint8_t* startCodes = sub + 14 + segX2 + 2;  // +2 reservedPad
+            for (uint16_t s = 0; s < segX2; s += 2) {
+                const uint32_t endC = be16(endCodes + s);
+                const uint32_t startC = be16(startCodes + s);
+                if (startC == 0xFFFF) continue;  // sentinel segment
+                if (startC <= endC) out.emplace_back(startC, endC);
+            }
+        }
+    } else if (format == 12 && subAvail >= 16) {
+        const uint32_t groups = be32(sub + 12);
+        for (uint32_t g = 0; g < groups && 16 + (g + 1) * 12u <= subAvail; ++g) {
+            const uint8_t* gr = sub + 16 + g * 12;
+            out.emplace_back(be32(gr), be32(gr + 4));
+        }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+// ---- TTC (TrueType Collection) face extraction -----------------------------
+// ThorVG only loads standalone sfnt fonts. Collection faces share glyph
+// tables addressed by file-absolute offsets, so the wanted face is repacked
+// into a self-contained blob with rewritten table offsets.
+
+std::vector<uint8_t> repackFace(const std::vector<uint8_t>& d, uint32_t dirOff) {
+    if (dirOff + 12 > d.size()) return {};
+    const uint16_t numTables = be16(d.data() + dirOff + 4);
+    if (dirOff + 12 + numTables * 16u > d.size()) return {};
+
+    std::vector<uint8_t> out(d.begin() + dirOff, d.begin() + dirOff + 12 + numTables * 16u);
+    for (uint16_t i = 0; i < numTables; ++i) {
+        const uint32_t off = be32(out.data() + 12 + i * 16 + 8);
+        const uint32_t len = be32(out.data() + 12 + i * 16 + 12);
+        if (off > d.size() || len > d.size() - off) return {};
+        const uint32_t newOff = static_cast<uint32_t>(out.size());
+        out.insert(out.end(), d.begin() + off, d.begin() + off + len);
+        out.resize((out.size() + 3) & ~size_t(3));  // 4-byte table alignment
+        uint8_t* rec = out.data() + 12 + i * 16 + 8;
+        rec[0] = static_cast<uint8_t>(newOff >> 24);
+        rec[1] = static_cast<uint8_t>(newOff >> 16);
+        rec[2] = static_cast<uint8_t>(newOff >> 8);
+        rec[3] = static_cast<uint8_t>(newOff);
+    }
+    return out;
+}
+
+// Standalone blob for the collection face matching `family` (lowercased);
+// falls back to the first parsable face. Empty when `d` is not a ttc.
+std::vector<uint8_t> extractTtcFace(const std::vector<uint8_t>& d, const std::string& family) {
+    if (d.size() < 16 || be32(d.data()) != 0x74746366 /*ttcf*/) return {};
+    const uint32_t numFonts = std::min<uint32_t>(be32(d.data() + 8), 64);
+    uint32_t chosen = 0;
+    bool haveAny = false;
+    for (uint32_t i = 0; i < numFonts; ++i) {
+        if (12 + (i + 1) * 4u > d.size()) break;
+        const uint32_t off = be32(d.data() + 12 + i * 4);
+        SfntInfo info;
+        if (!parseSfnt(d, info, off)) continue;
+        if (!haveAny) {
+            chosen = off;
+            haveAny = true;
+        }
+        if (toLower(info.family) == family) {
+            chosen = off;
+            break;
+        }
+    }
+    return haveAny ? repackFace(d, chosen) : std::vector<uint8_t>();
+}
+
 }  // namespace
 
 struct FontProvider::Impl {
@@ -178,6 +309,8 @@ struct FontProvider::Impl {
     std::unordered_map<std::string, std::string> registered;
     // composite key → loaded into ThorVG
     std::unordered_map<std::string, bool> loaded;
+    // composite key → sorted cmap coverage ranges
+    std::unordered_map<std::string, std::vector<std::pair<uint32_t, uint32_t>>> coverage;
     std::string defaultFamily = "Segoe UI";
     std::string lastGoodKey;
 
@@ -219,19 +352,26 @@ struct FontProvider::Impl {
         return {};
     }
 
-    // Loads the TTF under `key` so tvg::Text::font(key) resolves. Returns success.
+    // Loads the font file under `key` so tvg::Text::font(key) resolves.
+    // Collections (.ttc) are repacked to the face matching the key's family.
     bool loadAs(const std::string& key, const std::string& path) {
         if (auto it = loaded.find(key); it != loaded.end()) return it->second;
 
         std::ifstream f(path, std::ios::binary);
         bool ok = false;
         if (f) {
-            std::vector<char> data((std::istreambuf_iterator<char>(f)),
-                                   std::istreambuf_iterator<char>());
+            std::vector<uint8_t> data((std::istreambuf_iterator<char>(f)),
+                                      std::istreambuf_iterator<char>());
+            if (data.size() >= 4 && be32(data.data()) == 0x74746366 /*ttcf*/) {
+                const std::string family = key.substr(0, key.find('|'));
+                std::vector<uint8_t> face = extractTtcFace(data, family);
+                if (!face.empty()) data = std::move(face);
+            }
             if (!data.empty()) {
-                ok = tvg::Text::load(key.c_str(), data.data(),
+                ok = tvg::Text::load(key.c_str(), reinterpret_cast<char*>(data.data()),
                                      static_cast<uint32_t>(data.size()), "ttf",
                                      true /*copy*/) == tvg::Result::Success;
+                if (ok) coverage[key] = parseCmapRanges(data);
             }
         }
         loaded[key] = ok;
@@ -317,6 +457,30 @@ std::string FontProvider::fontKeyFor(const std::string& family, int weight, bool
         }
     }
     return impl_->lastGoodKey;
+}
+
+bool FontProvider::hasGlyph(const std::string& fontKey, unsigned long codepoint) {
+    auto it = impl_->coverage.find(fontKey);
+    if (it == impl_->coverage.end() || it->second.empty()) return true;  // unknown → assume yes
+    const auto& r = it->second;
+    auto lb = std::upper_bound(
+        r.begin(), r.end(), std::make_pair(static_cast<uint32_t>(codepoint), UINT32_MAX));
+    if (lb == r.begin()) return false;
+    --lb;
+    return codepoint >= lb->first && codepoint <= lb->second;
+}
+
+std::string FontProvider::fallbackFontFor(unsigned long codepoint, int weight, bool italic) {
+    // Common Windows families with broad CJK / symbol coverage. fontKeyFor
+    // itself may resolve to the default family — hasGlyph filters those out.
+    static const char* candidates[] = {"Microsoft YaHei", "SimHei",          "SimSun",
+                                       "Malgun Gothic",   "Yu Gothic UI",    "MS Gothic",
+                                       "Segoe UI Symbol", "Segoe UI Emoji"};
+    for (const char* fam : candidates) {
+        const std::string key = fontKeyFor(fam, weight, italic);
+        if (!key.empty() && hasGlyph(key, codepoint)) return key;
+    }
+    return {};
 }
 
 }  // namespace figmalib

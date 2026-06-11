@@ -29,6 +29,14 @@ public:
     // no font could be loaded at all.
     std::string fontKeyFor(const std::string& family, int weight, bool italic);
 
+    // Whether the loaded font behind `fontKey` maps `codepoint` to a glyph
+    // (cmap lookup). Unknown keys report true so callers don't churn.
+    bool hasGlyph(const std::string& fontKey, unsigned long codepoint);
+
+    // Key of a font that does carry `codepoint`, trying common system CJK /
+    // symbol families. Empty when nothing covers it.
+    std::string fallbackFontFor(unsigned long codepoint, int weight, bool italic);
+
 private:
     struct Impl;
     Impl* impl_;

@@ -24,6 +24,14 @@ public:
     // (Re)allocate the output buffer. Safe to call on window resize.
     bool setTarget(uint32_t width, uint32_t height);
 
+    // GPU mode: rasterize with ThorVG's GL engine straight into the given
+    // framebuffer object (0 = main surface) — zero CPU pixel copy. The GL
+    // context must be current on the calling thread for target/render calls.
+    // Returns false when ThorVG was built without the GL engine; the caller
+    // should fall back to setTarget(). pixels() is null in GPU mode.
+    bool setTargetGL(int32_t fboId, uint32_t width, uint32_t height);
+    bool isGpu() const;
+
     // Frame to render. The frame is drawn at origin (its canvas position is
     // ignored) and uniformly scaled to fit the target, centered (letterboxed).
     void setFrame(Node* frame);

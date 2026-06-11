@@ -129,7 +129,7 @@ void arcTo(tvg::Shape& shape, float x1, float y1, float rx, float ry, float rotD
 
 }  // namespace
 
-bool appendSvgPath(tvg::Shape& shape, const char* d) {
+bool appendSvgPath(tvg::Shape& shape, const char* d, float sx, float sy) {
     if (!d) return false;
     Cursor c{d};
 
@@ -158,6 +158,7 @@ bool appendSvgPath(tvg::Shape& shape, const char* d) {
         switch (op) {
         case 'M':
             if (!c.number(x) || !c.number(y)) return false;
+            x *= sx; y *= sy;
             if (rel) { x += curX; y += curY; }
             shape.moveTo(x, y);
             curX = startX = x;
@@ -166,18 +167,21 @@ bool appendSvgPath(tvg::Shape& shape, const char* d) {
             break;
         case 'L':
             if (!c.number(x) || !c.number(y)) return false;
+            x *= sx; y *= sy;
             if (rel) { x += curX; y += curY; }
             shape.lineTo(x, y);
             curX = x; curY = y;
             break;
         case 'H':
             if (!c.number(x)) return false;
+            x *= sx;
             if (rel) x += curX;
             shape.lineTo(x, curY);
             curX = x;
             break;
         case 'V':
             if (!c.number(y)) return false;
+            y *= sy;
             if (rel) y += curY;
             shape.lineTo(curX, y);
             curY = y;
@@ -185,6 +189,7 @@ bool appendSvgPath(tvg::Shape& shape, const char* d) {
         case 'C':
             if (!c.number(x1) || !c.number(y1) || !c.number(x2) || !c.number(y2) ||
                 !c.number(x) || !c.number(y)) return false;
+            x1 *= sx; y1 *= sy; x2 *= sx; y2 *= sy; x *= sx; y *= sy;
             if (rel) { x1 += curX; y1 += curY; x2 += curX; y2 += curY; x += curX; y += curY; }
             shape.cubicTo(x1, y1, x2, y2, x, y);
             ctrlX = x2; ctrlY = y2;
@@ -192,6 +197,7 @@ bool appendSvgPath(tvg::Shape& shape, const char* d) {
             break;
         case 'S': {
             if (!c.number(x2) || !c.number(y2) || !c.number(x) || !c.number(y)) return false;
+            x2 *= sx; y2 *= sy; x *= sx; y *= sy;
             if (rel) { x2 += curX; y2 += curY; x += curX; y += curY; }
             const bool reflect = lastCmd && std::strchr("CcSs", lastCmd);
             x1 = reflect ? 2 * curX - ctrlX : curX;
@@ -203,6 +209,7 @@ bool appendSvgPath(tvg::Shape& shape, const char* d) {
         }
         case 'Q':
             if (!c.number(x1) || !c.number(y1) || !c.number(x) || !c.number(y)) return false;
+            x1 *= sx; y1 *= sy; x *= sx; y *= sy;
             if (rel) { x1 += curX; y1 += curY; x += curX; y += curY; }
             // Quadratic → cubic degree elevation.
             shape.cubicTo(curX + 2.0f / 3.0f * (x1 - curX), curY + 2.0f / 3.0f * (y1 - curY),
@@ -212,6 +219,7 @@ bool appendSvgPath(tvg::Shape& shape, const char* d) {
             break;
         case 'T': {
             if (!c.number(x) || !c.number(y)) return false;
+            x *= sx; y *= sy;
             if (rel) { x += curX; y += curY; }
             const bool reflect = lastCmd && std::strchr("QqTt", lastCmd);
             x1 = reflect ? 2 * curX - ctrlX : curX;
@@ -227,6 +235,9 @@ bool appendSvgPath(tvg::Shape& shape, const char* d) {
             bool large, sweep;
             if (!c.number(rx) || !c.number(ry) || !c.number(rot) || !c.flag(large) ||
                 !c.flag(sweep) || !c.number(x) || !c.number(y)) return false;
+            // Approximate for rotated arcs under non-uniform scale.
+            rx *= std::fabs(sx); ry *= std::fabs(sy);
+            x *= sx; y *= sy;
             if (rel) { x += curX; y += curY; }
             arcTo(shape, curX, curY, rx, ry, rot, large, sweep, x, y);
             curX = x; curY = y;

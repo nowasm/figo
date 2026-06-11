@@ -16,11 +16,22 @@
 #endif
 
 int main(int argc, char** argv) {
+    // Flags: --gpu (ThorVG GL engine, zero-copy), --screenshot <file> (render
+    // ~30 frames, save a screenshot, exit — used for automated verification).
+    // First non-flag argument: .fig file, fig2json canvas.json, or REST JSON.
+    std::string input = ASSETS_DIR "/sample_ui.json";
+    bool wantGpu = false;
+    const char* shotPath = nullptr;
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--gpu") wantGpu = true;
+        else if (arg == "--screenshot" && i + 1 < argc) shotPath = argv[++i];
+        else input = arg;
+    }
+
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(900, 640, "figmalib - Figma UI in raylib");
 
-    // Optional argument: a .fig file, fig2json canvas.json, or REST API JSON.
-    const std::string input = argc > 1 ? argv[1] : ASSETS_DIR "/sample_ui.json";
     auto ui = figmalib::FigmaUI::fromFile(input);
 
     // Hover feedback: dim any button the pointer is over.
@@ -41,10 +52,17 @@ int main(int argc, char** argv) {
     ui->onClick("btn-quit", [&](figmalib::Node&) { quit = true; });
 
     figmalib::RaylibFigmaView view(*ui);
+    if (wantGpu) {
+        view.resize(GetScreenWidth(), GetScreenHeight());  // create the GL context targets
+        const bool ok = view.setGpu(true);
+        SetWindowTitle(ok ? "figmalib - Figma UI in raylib [GPU]"
+                          : "figmalib - Figma UI in raylib (GL engine unavailable)");
+    }
 
     // Left/right arrows page through frames (useful for multi-screen .fig files).
     const auto frames = ui->frameNames();
     int frameIdx = 0;
+    int frameCount = 0;
 
     while (!WindowShouldClose() && !quit) {
         if (!frames.empty() && (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_LEFT))) {
@@ -52,6 +70,20 @@ int main(int argc, char** argv) {
             frameIdx = (frameIdx + dir + static_cast<int>(frames.size())) %
                        static_cast<int>(frames.size());
             ui->selectFrame(frames[frameIdx]);
+        }
+        // G toggles GPU (ThorVG GL engine) vs CPU rasterization.
+        if (IsKeyPressed(KEY_G)) {
+            const bool on = view.setGpu(!view.gpu());
+            SetWindowTitle(on ? "figmalib - Figma UI in raylib [GPU]"
+                              : "figmalib - Figma UI in raylib");
+        }
+        // R toggles responsive reflow (constraints/auto-layout) vs scale-to-fit.
+        if (IsKeyPressed(KEY_R)) {
+            const bool reflow = ui->resizeMode() == figmalib::FigmaUI::ResizeMode::Reflow;
+            ui->setResizeMode(reflow ? figmalib::FigmaUI::ResizeMode::Scale
+                                     : figmalib::FigmaUI::ResizeMode::Reflow);
+            SetWindowTitle(reflow ? "figmalib - Figma UI in raylib"
+                                  : "figmalib - Figma UI in raylib [reflow]");
         }
         view.resize(GetScreenWidth(), GetScreenHeight());
         view.update();
@@ -74,6 +106,11 @@ int main(int argc, char** argv) {
         view.draw();
         DrawFPS(8, 8);
         EndDrawing();
+
+        if (shotPath && ++frameCount >= 30) {
+            TakeScreenshot(shotPath);
+            quit = true;
+        }
     }
 
     CloseWindow();
