@@ -46,13 +46,19 @@ Node* deepHit(Node& root, float wx, float wy, bool isRoot = true) {
 }
 
 // Figma single click: the ancestor of the deep hit that is a direct child of
-// the current scope.
+// the current scope. When the point lies outside the scoped container
+// entirely, fall back to top-level objects (Figma highlights/selects those
+// and resets the scope).
 Node* scopedHit(EditorState& ed, float wx, float wy) {
     Node* hit = deepHit(*ed.page, wx, wy);
     if (!hit) return nullptr;
-    Node* n = hit;
-    while (n->parent && n->parent != ed.scope) n = n->parent;
-    return n->parent == ed.scope ? n : nullptr;
+    for (Node* n = hit; n->parent; n = n->parent) {
+        if (n->parent == ed.scope) return n;
+    }
+    for (Node* n = hit; n->parent; n = n->parent) {
+        if (n->parent == ed.page) return n;
+    }
+    return nullptr;
 }
 
 // ---- gesture application ----------------------------------------------------
@@ -309,6 +315,9 @@ void updateCanvas(EditorState& ed) {
         } else {
             Node* hit = ctrl ? deepHit(*ed.page, wx, wy) : scopedHit(ed, wx, wy);
             if (hit) {
+                // Keep the scope in sync with what was actually clicked
+                // (clicking outside the drilled container resets it).
+                if (!shift && hit->parent) ed.scope = hit->parent;
                 if (shift) {
                     if (ed.isSelected(hit)) {
                         ed.selection.erase(
@@ -335,6 +344,20 @@ void updateCanvas(EditorState& ed) {
                 ed.dragStartWY = wy;
             }
         }
+    }
+
+    // Safety net: if the release happened outside the window and the event
+    // was lost, finish the gesture instead of leaving the drag stuck (which
+    // would also disable hover until the next click).
+    if (ed.drag != DragMode::None && !IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+        !IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) &&
+        !IsMouseButtonReleased(MOUSE_BUTTON_LEFT) &&
+        !IsMouseButtonReleased(MOUSE_BUTTON_MIDDLE)) {
+        if (ed.drag == DragMode::MoveNodes || ed.drag == DragMode::Resize) {
+            ed.commitGesture();
+        }
+        ed.drag = DragMode::None;
+        ed.resizeHandle = -1;
     }
 
     // ---- drag update ----
