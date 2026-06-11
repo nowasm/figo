@@ -222,6 +222,17 @@ void parseLayout(const json& j, Node& node) {
     node.layoutGrow = jfloat(j, "layoutGrow", 0);
     node.layoutAlignStretch = jstr(j, "layoutAlign") == "STRETCH";
     node.layoutAbsolute = jstr(j, "layoutPositioning") == "ABSOLUTE";
+
+    const std::string overflow = jstr(j, "overflowDirection", "NONE");
+    if (overflow == "HORIZONTAL_SCROLLING") {
+        node.scrollDirection = ScrollDirection::Horizontal;
+    } else if (overflow == "VERTICAL_SCROLLING") {
+        node.scrollDirection = ScrollDirection::Vertical;
+    } else if (overflow == "HORIZONTAL_AND_VERTICAL_SCROLLING") {
+        node.scrollDirection = ScrollDirection::Both;
+    }
+    node.scrollFixed = jbool(j, "isFixed", false) || jstr(j, "scrollBehavior") == "FIXED";
+
     node.minWidth = jfloat(j, "minWidth");
     node.maxWidth = jfloat(j, "maxWidth");
     node.minHeight = jfloat(j, "minHeight");

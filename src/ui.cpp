@@ -1,6 +1,8 @@
 #include "figmalib/ui.h"
 
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <map>
@@ -18,6 +20,15 @@ struct FigmaUI::Impl {
     Node* hovered = nullptr;
     Node* pressed = nullptr;
     ResizeMode resizeMode = ResizeMode::Scale;
+
+    // Touch-style drag scrolling: candidate picked at pointerDown, panning
+    // starts once the pointer travels past a small threshold; the release is
+    // then swallowed instead of clicking.
+    Node* dragScrollNode = nullptr;
+    bool dragScrolling = false;
+    float dragAccumX = 0, dragAccumY = 0;
+    float lastPointerX = 0, lastPointerY = 0;
+    static constexpr float kDragScrollThreshold = 6.0f;  // viewport px
     std::unordered_map<std::string, std::vector<ClickHandler>> clickHandlers;
     std::unordered_map<std::string, std::vector<HoverHandler>> hoverHandlers;
 
@@ -41,7 +52,7 @@ struct FigmaUI::Impl {
         const bool inside =
             lx >= 0 && ly >= 0 && lx <= node.width && ly <= node.height;
 
-        if (node.clipsContent && !inside) return nullptr;
+        if ((node.clipsContent || node.scrolls()) && !inside) return nullptr;
 
         // Topmost child wins.
         for (auto it = node.children.rbegin(); it != node.children.rend(); ++it) {
@@ -77,6 +88,70 @@ struct FigmaUI::Impl {
     Node* findMutable(const std::string& name) {
         Node* base = frame ? frame : (doc ? doc->root.get() : nullptr);
         return base ? base->findByName(name) : nullptr;
+    }
+
+    // ---- Scrolling ----
+
+    // Frame-local pixels per viewport pixel (contentTransform is a uniform
+    // scale-to-fit, so one axis suffices).
+    float viewportToFrameScale() const {
+        const float s = renderer.contentTransform().m00;
+        return s > 0 ? 1.0f / s : 1.0f;
+    }
+
+    // Move a frame's content by (dx, dy) in frame-local pixels, clamped to
+    // the scroll range. Returns true when the offset actually changed.
+    static bool applyScroll(Node& n, float dx, float dy) {
+        const float nx = std::clamp(n.scrollX + dx, 0.0f, n.maxScrollX());
+        const float ny = std::clamp(n.scrollY + dy, 0.0f, n.maxScrollY());
+        if (nx == n.scrollX && ny == n.scrollY) return false;
+        n.scrollX = nx;
+        n.scrollY = ny;
+        return true;
+    }
+
+    // Deepest scrollable frame with a non-empty range containing the point
+    // (frame coordinates). Unlike hitTestFrame this ignores paintability, so
+    // empty padding inside a scroll area still scrolls.
+    Node* scrollableUnder(Node& node, float fx, float fy) {
+        if (!node.effectivelyVisible() || node.type == NodeType::Slice) return nullptr;
+        const auto inv = node.absoluteTransform.inverted();
+        if (!inv) return nullptr;
+        float lx, ly;
+        inv->apply(fx, fy, lx, ly);
+        const bool inside =
+            lx >= 0 && ly >= 0 && lx <= node.width && ly <= node.height;
+        if ((node.clipsContent || node.scrolls()) && !inside) return nullptr;
+        for (auto it = node.children.rbegin(); it != node.children.rend(); ++it) {
+            if (Node* s = scrollableUnder(**it, fx, fy)) return s;
+        }
+        if (inside && node.scrolls() &&
+            (node.maxScrollX() > 0 || node.maxScrollY() > 0)) {
+            return &node;
+        }
+        return nullptr;
+    }
+
+    Node* scrollableAtViewport(float x, float y) {
+        if (!frame) return nullptr;
+        const auto inv = renderer.contentTransform().inverted();
+        if (!inv) return nullptr;
+        float fx, fy;
+        inv->apply(x, y, fx, fy);
+        return scrollableUnder(*frame, fx, fy);
+    }
+
+    // Apply a frame-local delta at `start`, bubbling to scrollable ancestors
+    // when the inner frame is already at its limit.
+    bool scrollWithBubble(Node* start, float dx, float dy) {
+        for (Node* n = start; n; n = n->parent) {
+            if (n->scrolls() && applyScroll(*n, dx, dy)) {
+                renderer.markDirty();
+                return true;
+            }
+            if (n == frame) break;
+        }
+        return false;
     }
 };
 
@@ -182,6 +257,29 @@ uint32_t FigmaUI::pixelHeight() const { return impl_->renderer.height(); }
 void FigmaUI::markDirty() { impl_->renderer.markDirty(); }
 
 void FigmaUI::pointerMove(float x, float y) {
+    if (impl_->pressed && impl_->dragScrollNode) {
+        const float dx = x - impl_->lastPointerX, dy = y - impl_->lastPointerY;
+        impl_->lastPointerX = x;
+        impl_->lastPointerY = y;
+        if (!impl_->dragScrolling) {
+            impl_->dragAccumX += dx;
+            impl_->dragAccumY += dy;
+            if (std::hypot(impl_->dragAccumX, impl_->dragAccumY) >
+                Impl::kDragScrollThreshold) {
+                impl_->dragScrolling = true;
+                // Replay the pre-threshold travel so the content doesn't jump.
+                const float s = impl_->viewportToFrameScale();
+                impl_->scrollWithBubble(impl_->dragScrollNode,
+                                        -impl_->dragAccumX * s, -impl_->dragAccumY * s);
+            }
+        } else {
+            // Content follows the finger: dragging up reveals what is below.
+            const float s = impl_->viewportToFrameScale();
+            impl_->scrollWithBubble(impl_->dragScrollNode, -dx * s, -dy * s);
+        }
+        if (impl_->dragScrolling) return;  // no hover churn while panning
+    }
+
     Node* hit = impl_->hitTestViewport(x, y);
     if (hit == impl_->hovered) return;
     if (impl_->hovered) {
@@ -197,9 +295,23 @@ void FigmaUI::pointerMove(float x, float y) {
 
 void FigmaUI::pointerDown(float x, float y) {
     impl_->pressed = impl_->hitTestViewport(x, y);
+    impl_->dragScrollNode = impl_->scrollableAtViewport(x, y);
+    impl_->dragScrolling = false;
+    impl_->dragAccumX = impl_->dragAccumY = 0;
+    impl_->lastPointerX = x;
+    impl_->lastPointerY = y;
 }
 
 void FigmaUI::pointerUp(float x, float y) {
+    if (impl_->dragScrolling) {
+        // The gesture was a pan, not a click.
+        impl_->pressed = nullptr;
+        impl_->dragScrollNode = nullptr;
+        impl_->dragScrolling = false;
+        return;
+    }
+    impl_->dragScrollNode = nullptr;
+
     Node* hit = impl_->hitTestViewport(x, y);
     if (hit && impl_->pressed) {
         // Click counts if press and release share the hit node or an ancestor.
@@ -231,6 +343,26 @@ void FigmaUI::pointerUp(float x, float y) {
 Node* FigmaUI::hitTest(float x, float y) { return impl_->hitTestViewport(x, y); }
 Node* FigmaUI::hoveredNode() const { return impl_->hovered; }
 Node* FigmaUI::pressedNode() const { return impl_->pressed; }
+
+bool FigmaUI::scrollBy(float x, float y, float dx, float dy) {
+    Node* target = impl_->scrollableAtViewport(x, y);
+    if (!target) return false;
+    const float s = impl_->viewportToFrameScale();
+    return impl_->scrollWithBubble(target, dx * s, dy * s);
+}
+
+bool FigmaUI::setScroll(const std::string& nodeName, float offsetX, float offsetY) {
+    Node* n = impl_->findMutable(nodeName);
+    if (!n || !n->scrolls()) return false;
+    n->scrollX = std::clamp(offsetX, 0.0f, n->maxScrollX());
+    n->scrollY = std::clamp(offsetY, 0.0f, n->maxScrollY());
+    impl_->renderer.markDirty();
+    return true;
+}
+
+Node* FigmaUI::scrollableAt(float x, float y) {
+    return impl_->scrollableAtViewport(x, y);
+}
 
 void FigmaUI::onClick(const std::string& nodeName, ClickHandler fn) {
     impl_->clickHandlers[nodeName].push_back(std::move(fn));

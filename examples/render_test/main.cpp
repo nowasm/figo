@@ -133,6 +133,53 @@ int main(int argc, char** argv) {
         ui->setViewport(900, 640);
     }
 
+    // Scrolling: find a scrollable frame, scroll it to the end, and verify
+    // the pixels actually moved (and that fixed children kept the frame from
+    // being a pure translate — any change at all passes).
+    {
+        figmalib::Node* scrollable = nullptr;
+        for (const auto& frameName : seen) {
+            if (!ui->selectFrame(frameName)) continue;
+            ui->currentFrame()->visit([&](figmalib::Node& n) {
+                if (!scrollable && n.scrolls() &&
+                    (n.maxScrollX() > 0 || n.maxScrollY() > 0)) {
+                    scrollable = &n;
+                }
+                return true;
+            });
+            if (scrollable) break;
+        }
+        if (!scrollable) {
+            std::printf("scroll: no scrollable node in document (skipped)\n");
+        } else if (!ui->render()) {
+            std::printf("FAIL: scroll baseline render\n");
+            ++failures;
+        } else {
+            const uint32_t total = ui->pixelWidth() * ui->pixelHeight();
+            std::vector<uint32_t> before(ui->pixels(), ui->pixels() + total);
+            const float toX = scrollable->maxScrollX(), toY = scrollable->maxScrollY();
+            if (!ui->setScroll(scrollable->name, toX, toY) || !ui->render()) {
+                std::printf("FAIL: setScroll(%s)\n", scrollable->name.c_str());
+                ++failures;
+            } else {
+                uint32_t diff = 0;
+                for (uint32_t i = 0; i < total; ++i) {
+                    if (ui->pixels()[i] != before[i]) ++diff;
+                }
+                writeBmp("render_scrolled.bmp", ui->pixels(), ui->pixelWidth(),
+                         ui->pixelHeight());
+                std::printf("scroll %s by (%.0f, %.0f): %.1f%% pixels changed -> "
+                            "render_scrolled.bmp\n",
+                            scrollable->name.c_str(), toX, toY, 100.0 * diff / total);
+                if (diff == 0) {
+                    std::printf("FAIL: scrolling changed nothing\n");
+                    ++failures;
+                }
+            }
+            ui->setScroll(scrollable->name, 0, 0);
+        }
+    }
+
     // Hit-test sanity on the sample UI: center of the start button.
     if (ui->selectFrame("MainMenu")) {
         ui->render();

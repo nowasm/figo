@@ -1015,6 +1015,13 @@ void parseKiwiLayout(const json& j, Node& node) {
     node.maxWidth = sizeLimit("maxWidth");
     node.minHeight = sizeLimit("minHeight");
     node.maxHeight = sizeLimit("maxHeight");
+
+    const std::string scroll = jstr(j, "scrollDirection", "NONE");
+    if (scroll == "HORIZONTAL") node.scrollDirection = ScrollDirection::Horizontal;
+    else if (scroll == "VERTICAL") node.scrollDirection = ScrollDirection::Vertical;
+    else if (scroll == "BOTH") node.scrollDirection = ScrollDirection::Both;
+    node.scrollFixed =
+        jstr(j, "scrollBehavior") == "FIXED_WHEN_CHILD_OF_SCROLLING_FRAME";
 }
 
 std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {

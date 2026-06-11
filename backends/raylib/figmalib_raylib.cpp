@@ -59,6 +59,11 @@ void RaylibFigmaView::update() {
     ui_.pointerMove(mouse.x, mouse.y);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) ui_.pointerDown(mouse.x, mouse.y);
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) ui_.pointerUp(mouse.x, mouse.y);
+    const Vector2 wheel = GetMouseWheelMoveV();
+    if (wheel.x != 0 || wheel.y != 0) {
+        // One wheel notch ≈ 48 viewport px; wheel-up reveals content above.
+        ui_.scrollBy(mouse.x, mouse.y, -wheel.x * 48.0f, -wheel.y * 48.0f);
+    }
 
     if (gpuActive_) {
         // ThorVG drives GL directly: flush raylib's pending batch first, then

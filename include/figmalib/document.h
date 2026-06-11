@@ -146,6 +146,10 @@ struct PathGeometry {
 // Scale = position and size scale proportionally.
 enum class Constraint { Min, Center, Max, Stretch, Scale };
 
+// Which axes a frame's content can scroll along. .fig: scrollDirection;
+// REST: overflowDirection (HORIZONTAL/VERTICAL/HORIZONTAL_AND_VERTICAL_SCROLLING).
+enum class ScrollDirection { None, Horizontal, Vertical, Both };
+
 // Auto-layout ("stack") container properties. REST: layoutMode/padding*/
 // itemSpacing/...; canvas.json (kiwi): stackMode/stackSpacing/stack*Padding/...
 struct AutoLayout {
@@ -231,10 +235,17 @@ struct NodeData {
     Mat23 baseTransform;
     float baseWidth = 0, baseHeight = 0;
 
+    // ---- Scrolling ----
+    ScrollDirection scrollDirection = ScrollDirection::None;
+    // Child of a scrolling frame that stays put while siblings scroll
+    // (.fig/REST scrollBehavior FIXED_WHEN_CHILD_OF_SCROLLING_FRAME / FIXED).
+    bool scrollFixed = false;
+
     // ---- Runtime state (set by the renderer / UI layer) ----
     Mat23 absoluteTransform;        // computed during scene build
     float runtimeOpacity = -1.0f;   // override; <0 → use authored opacity
     int runtimeVisible = -1;        // -1 inherit, 0 hidden, 1 visible
+    float scrollX = 0, scrollY = 0;  // content offset of a scrolling frame, ≥0
 };
 
 struct Node : NodeData {
@@ -247,6 +258,14 @@ struct Node : NodeData {
     float effectiveOpacity() const {
         return runtimeOpacity < 0 ? opacity : runtimeOpacity;
     }
+    bool scrolls() const { return scrollDirection != ScrollDirection::None; }
+
+    // Extent of the scrollable content: bounding box (from the node's origin)
+    // of all visible non-fixed children in node-local coordinates. The scroll
+    // range is contentExtent − frame size, clamped to ≥0 per axis.
+    void contentExtent(float& w, float& h) const;
+    float maxScrollX() const;
+    float maxScrollY() const;
 
     Node* findById(const std::string& nodeId);
     Node* findByName(const std::string& nodeName);

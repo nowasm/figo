@@ -58,6 +58,24 @@ public:
     void pointerDown(float x, float y);
     void pointerUp(float x, float y);
 
+    // Wheel/trackpad scroll at a viewport position: moves the content of the
+    // innermost scrollable frame under the point (positive dy scrolls the
+    // content up, i.e. reveals what is below). When that frame is already at
+    // its limit the delta bubbles to the next scrollable ancestor. Returns
+    // false when nothing scrollable consumed the delta.
+    //
+    // Touch-style drag scrolling needs no extra calls: pointerDown +
+    // pointerMove over a scrollable frame pans it once the drag exceeds a
+    // small threshold, and the release is not reported as a click.
+    bool scrollBy(float x, float y, float dx, float dy);
+
+    // Set a scrolling frame's offset directly (clamped to the content range).
+    bool setScroll(const std::string& nodeName, float offsetX, float offsetY);
+
+    // Innermost scrollable frame under the point with a non-empty scroll
+    // range, or nullptr.
+    Node* scrollableAt(float x, float y);
+
     // Deepest visible node under the point, or nullptr.
     Node* hitTest(float x, float y);
     Node* hoveredNode() const;

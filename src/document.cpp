@@ -1,6 +1,46 @@
 #include "figmalib/document.h"
 
+#include <algorithm>
+
 namespace figmalib {
+
+void Node::contentExtent(float& w, float& h) const {
+    w = 0;
+    h = 0;
+    for (const auto& c : children) {
+        if (!c->effectivelyVisible() || c->scrollFixed) continue;
+        // Children can be rotated: take the max over all four corners.
+        const float xs[2] = {0, c->width}, ys[2] = {0, c->height};
+        for (float cx : xs) {
+            for (float cy : ys) {
+                float px, py;
+                c->relativeTransform.apply(cx, cy, px, py);
+                w = std::max(w, px);
+                h = std::max(h, py);
+            }
+        }
+    }
+}
+
+float Node::maxScrollX() const {
+    if (scrollDirection != ScrollDirection::Horizontal &&
+        scrollDirection != ScrollDirection::Both) {
+        return 0;
+    }
+    float w, h;
+    contentExtent(w, h);
+    return std::max(0.0f, w - width);
+}
+
+float Node::maxScrollY() const {
+    if (scrollDirection != ScrollDirection::Vertical &&
+        scrollDirection != ScrollDirection::Both) {
+        return 0;
+    }
+    float w, h;
+    contentExtent(w, h);
+    return std::max(0.0f, h - height);
+}
 
 Node* Node::findById(const std::string& nodeId) {
     if (id == nodeId) return this;
