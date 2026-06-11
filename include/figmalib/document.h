@@ -1,0 +1,218 @@
+#pragma once
+// figmalib — Figma document model
+// In-memory representation of a Figma file (REST API JSON, geometry=paths).
+
+#include <array>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace figmalib {
+
+struct Color {
+    float r = 0, g = 0, b = 0, a = 1;
+};
+
+// 2x3 affine transform, row-major:
+//   x' = m00*x + m01*y + m02
+//   y' = m10*x + m11*y + m12
+struct Mat23 {
+    float m00 = 1, m01 = 0, m02 = 0;
+    float m10 = 0, m11 = 1, m12 = 0;
+
+    static Mat23 identity() { return {}; }
+
+    Mat23 operator*(const Mat23& o) const {
+        Mat23 r;
+        r.m00 = m00 * o.m00 + m01 * o.m10;
+        r.m01 = m00 * o.m01 + m01 * o.m11;
+        r.m02 = m00 * o.m02 + m01 * o.m12 + m02;
+        r.m10 = m10 * o.m00 + m11 * o.m10;
+        r.m11 = m10 * o.m01 + m11 * o.m11;
+        r.m12 = m10 * o.m02 + m11 * o.m12 + m12;
+        return r;
+    }
+
+    void apply(float x, float y, float& ox, float& oy) const {
+        ox = m00 * x + m01 * y + m02;
+        oy = m10 * x + m11 * y + m12;
+    }
+
+    std::optional<Mat23> inverted() const {
+        float det = m00 * m11 - m01 * m10;
+        if (det == 0.0f) return std::nullopt;
+        float inv = 1.0f / det;
+        Mat23 r;
+        r.m00 = m11 * inv;
+        r.m01 = -m01 * inv;
+        r.m10 = -m10 * inv;
+        r.m11 = m00 * inv;
+        r.m02 = -(r.m00 * m02 + r.m01 * m12);
+        r.m12 = -(r.m10 * m02 + r.m11 * m12);
+        return r;
+    }
+};
+
+enum class PaintType {
+    Solid,
+    GradientLinear,
+    GradientRadial,
+    GradientAngular,  // rendered as radial fallback
+    GradientDiamond,  // rendered as radial fallback
+    Image,
+};
+
+struct GradientStop {
+    float position = 0;
+    Color color;
+};
+
+struct Paint {
+    PaintType type = PaintType::Solid;
+    bool visible = true;
+    float opacity = 1.0f;
+    Color color;  // Solid
+    std::vector<GradientStop> stops;
+    // Gradient handles, normalized to the node's bounding box (0..1).
+    // [0] = start/center, [1] = end/edge, [2] = width handle.
+    std::array<float, 2> handle0{0, 0};
+    std::array<float, 2> handle1{1, 1};
+    std::array<float, 2> handle2{0, 1};
+    std::string imageRef;          // Image
+    std::string imageScaleMode;    // FILL | FIT | TILE | STRETCH
+};
+
+enum class NodeType {
+    Document,
+    Canvas,
+    Frame,
+    Group,
+    Section,
+    Rectangle,
+    Ellipse,
+    Line,
+    Vector,
+    BooleanOperation,
+    Star,
+    RegularPolygon,
+    Text,
+    Component,
+    ComponentSet,
+    Instance,
+    Slice,
+    Unknown,
+};
+
+enum class StrokeAlign { Inside, Outside, Center };
+
+struct Effect {
+    enum class Type { DropShadow, InnerShadow, LayerBlur, BackgroundBlur };
+    Type type = Type::DropShadow;
+    bool visible = true;
+    Color color{0, 0, 0, 0.25f};
+    float offsetX = 0, offsetY = 0;
+    float radius = 0;  // blur radius
+    float spread = 0;
+};
+
+struct TextStyle {
+    std::string fontFamily = "Inter";
+    std::string fontPostScriptName;
+    float fontSize = 14;
+    int fontWeight = 400;
+    bool italic = false;
+    float lineHeightPx = 0;    // 0 → font default
+    float letterSpacing = 0;
+    enum class AlignH { Left, Center, Right, Justified } alignH = AlignH::Left;
+    enum class AlignV { Top, Center, Bottom } alignV = AlignV::Top;
+    // Figma textAutoResize: NONE | HEIGHT | WIDTH_AND_HEIGHT | TRUNCATE.
+    // WIDTH_AND_HEIGHT boxes hug the text, so wrapping must be disabled (a
+    // substituted font could otherwise wrap and break the layout).
+    std::string autoResize = "NONE";
+    bool truncateEnding = false;  // textTruncation == "ENDING" → ellipsis
+    int maxLines = 0;             // 0 = unlimited
+};
+
+// A single path from fillGeometry/strokeGeometry: SVG path data + winding rule.
+struct PathGeometry {
+    std::string path;
+    bool evenOdd = false;
+};
+
+// Rich-text segment: [start, end) byte range of Node::characters with its own
+// style. Only produced for ASCII single-style-per-character documents; the
+// renderer falls back to the node's base style when it cannot honor a run.
+struct TextRun {
+    int start = 0, end = 0;
+    TextStyle style;
+    std::optional<Color> color;  // overrides the node's fill for this run
+};
+
+struct Node {
+    std::string id;
+    std::string name;
+    NodeType type = NodeType::Unknown;
+    bool visible = true;
+    float opacity = 1.0f;
+
+    // Transform relative to parent; node-local coordinates have origin at the
+    // node's top-left corner.
+    Mat23 relativeTransform;
+    float width = 0, height = 0;
+    bool clipsContent = false;
+
+    std::vector<Paint> fills;
+    std::vector<Paint> strokes;
+    float strokeWeight = 1.0f;
+    StrokeAlign strokeAlign = StrokeAlign::Inside;
+    std::vector<float> strokeDashes;
+    std::string strokeCap;   // NONE | ROUND | SQUARE
+    std::string strokeJoin;  // MITER | BEVEL | ROUND
+
+    float cornerRadius = 0;
+    std::optional<std::array<float, 4>> rectangleCornerRadii;  // TL, TR, BR, BL
+
+    std::vector<PathGeometry> fillGeometry;
+    std::vector<PathGeometry> strokeGeometry;
+
+    std::vector<Effect> effects;
+
+    // Text
+    std::string characters;
+    TextStyle textStyle;
+    std::vector<TextRun> textRuns;  // empty → uniform style
+
+    Node* parent = nullptr;
+    std::vector<std::unique_ptr<Node>> children;
+
+    // ---- Runtime state (set by the renderer / UI layer) ----
+    Mat23 absoluteTransform;        // computed during scene build
+    float runtimeOpacity = -1.0f;   // override; <0 → use authored opacity
+    int runtimeVisible = -1;        // -1 inherit, 0 hidden, 1 visible
+
+    bool effectivelyVisible() const {
+        return runtimeVisible < 0 ? visible : runtimeVisible != 0;
+    }
+    float effectiveOpacity() const {
+        return runtimeOpacity < 0 ? opacity : runtimeOpacity;
+    }
+
+    Node* findById(const std::string& nodeId);
+    Node* findByName(const std::string& nodeName);
+    void visit(const std::function<bool(Node&)>& fn);  // fn returns false to stop descent
+};
+
+struct Document {
+    std::string name;
+    std::unique_ptr<Node> root;  // DOCUMENT node; children are CANVAS pages
+
+    Node* findById(const std::string& id) { return root ? root->findById(id) : nullptr; }
+    Node* findByName(const std::string& n) { return root ? root->findByName(n) : nullptr; }
+
+    // Top-level frames of every page, in document order.
+    std::vector<Node*> topLevelFrames() const;
+};
+
+}  // namespace figmalib

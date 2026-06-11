@@ -1,0 +1,85 @@
+cmake_minimum_required(VERSION 3.21)
+project(figmalib LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+option(FIGMALIB_BACKEND_RAYLIB "Build the raylib backend" ON)
+option(FIGMALIB_BUILD_EXAMPLES "Build example apps" ON)
+
+# ThorVG: prebuilt static library (meson: --default-library=static -Dstatic=true).
+set(THORVG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/inc" CACHE PATH
+    "Directory containing thorvg.h")
+set(THORVG_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static/src/libthorvg-1.a"
+    CACHE FILEPATH "Path to the static thorvg library")
+
+if(NOT EXISTS "${THORVG_LIBRARY}")
+    message(FATAL_ERROR "ThorVG static library not found at ${THORVG_LIBRARY}. "
+        "Build it with: meson setup build_static --default-library=static -Dstatic=true "
+        "-Dengines=cpu -Dloaders=svg,lottie,ttf,png,jpg,webp && ninja -C build_static")
+endif()
+
+# ThorVG was built /MD (meson release default); match it in every config.
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+endif()
+
+# ---- core library ----
+# fig2json CLI used to convert .fig files at load time (override at runtime
+# with the FIGMALIB_FIG2JSON environment variable).
+set(FIGMALIB_FIG2JSON "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.exe"
+    CACHE FILEPATH "Path to the fig2json executable")
+
+add_library(figmalib STATIC
+    src/document.cpp
+    src/parser.cpp
+    src/canvas_parser.cpp
+    src/fig_loader.cpp
+    src/svg_path.cpp
+    src/font_provider.cpp
+    src/scene_builder.cpp
+    src/renderer.cpp
+    src/ui.cpp
+)
+target_compile_definitions(figmalib PRIVATE
+    FIGMALIB_FIG2JSON_DEFAULT="${FIGMALIB_FIG2JSON}")
+target_include_directories(figmalib
+    PUBLIC include "${THORVG_INCLUDE_DIR}"
+    PRIVATE src third_party
+)
+target_compile_definitions(figmalib PUBLIC TVG_STATIC)
+target_link_libraries(figmalib PUBLIC "${THORVG_LIBRARY}")
+if(WIN32)
+    target_link_libraries(figmalib PRIVATE advapi32)  # font registry lookup
+endif()
+
+# ---- raylib backend ----
+if(FIGMALIB_BACKEND_RAYLIB)
+    include(FetchContent)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(raylib
+        URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
+    )
+    FetchContent_MakeAvailable(raylib)
+
+    add_library(figmalib_raylib STATIC backends/raylib/figmalib_raylib.cpp)
+    target_include_directories(figmalib_raylib PUBLIC backends/raylib)
+    target_link_libraries(figmalib_raylib PUBLIC figmalib raylib)
+endif()
+
+# ---- examples ----
+if(FIGMALIB_BUILD_EXAMPLES AND FIGMALIB_BACKEND_RAYLIB)
+    add_executable(demo_raylib examples/demo_raylib/main.cpp)
+    target_link_libraries(demo_raylib PRIVATE figmalib_raylib)
+    target_compile_definitions(demo_raylib PRIVATE
+        ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples/assets")
+endif()
+
+if(FIGMALIB_BUILD_EXAMPLES)
+    add_executable(render_test examples/render_test/main.cpp)
+    target_link_libraries(render_test PRIVATE figmalib)
+    target_compile_definitions(render_test PRIVATE
+        ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples/assets")
+endif()
