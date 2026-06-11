@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 
 #include "editor.h"
@@ -11,12 +12,15 @@ int kLayersW = 260;
 int kInspectorW = 280;
 
 void initUiScale() {
-    // GLFW only reports a DPI scale with FLAG_WINDOW_HIGHDPI; infer from the
-    // monitor's physical resolution instead (1080p ≈ 1x, 4K ≈ 2x).
+    // With FLAG_WINDOW_HIGHDPI the reported DPI scale is authoritative;
+    // otherwise infer from the monitor's physical resolution (4K ≈ 2x).
     const Vector2 dpi = GetWindowScaleDPI();
-    const float fromMonitor =
-        static_cast<float>(GetMonitorWidth(GetCurrentMonitor())) / 1920.0f;
-    gUiScale = std::max({1.0f, dpi.x, fromMonitor});
+    if (dpi.x > 1.05f) {
+        gUiScale = dpi.x;
+    } else {
+        gUiScale = std::max(
+            1.0f, static_cast<float>(GetMonitorWidth(GetCurrentMonitor())) / 1920.0f);
+    }
     gUiScale = std::min(gUiScale, 3.0f);
     if (const char* env = std::getenv("FIGMAEDIT_SCALE"); env && *env) {
         gUiScale = std::max(0.5f, std::min(4.0f, static_cast<float>(std::atof(env))));
@@ -54,7 +58,11 @@ void collectCodepoints(const std::string& s, std::unordered_set<int>& out, bool&
         }
         if (cp >= 32) {
             out.insert(cp);
-            if (cp >= 0x2E80) hasCjk = true;  // CJK radicals onward
+            // CJK proper (not emoji/symbols): radicals..unified, kana, fullwidth.
+            if ((cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) ||
+                (cp >= 0xFF00 && cp <= 0xFFEF)) {
+                hasCjk = true;
+            }
         }
         i += len;
     }
@@ -77,8 +85,12 @@ void loadUiFont(const std::vector<int>& codepoints, bool wantCjk) {
             gUiFont = f;
             gUiFontLoaded = true;
             SetTextureFilter(gUiFont.texture, TEXTURE_FILTER_BILINEAR);
+            std::fprintf(stderr, "[font] loaded %s (%d glyphs, cjk=%d)\n", path,
+                         f.glyphCount, wantCjk ? 1 : 0);
             return;
         }
+        std::fprintf(stderr, "[font] failed: %s (%zu codepoints)\n", path,
+                     codepoints.size());
     }
     if (!gUiFontLoaded) gUiFont = GetFontDefault();  // last resort
 }
@@ -124,6 +136,11 @@ NodeProps NodeProps::capture(Node* n) {
     p.cornerRadius = n->cornerRadius;
     p.visible = n->visible;
     p.fills = n->fills;
+    p.strokes = n->strokes;
+    p.strokeWeight = n->strokeWeight;
+    p.strokeAlign = n->strokeAlign;
+    p.effects = n->effects;
+    p.textStyle = n->textStyle;
     p.characters = n->characters;
     return p;
 }
@@ -136,6 +153,11 @@ void NodeProps::apply() const {
     node->cornerRadius = cornerRadius;
     node->visible = visible;
     node->fills = fills;
+    node->strokes = strokes;
+    node->strokeWeight = strokeWeight;
+    node->strokeAlign = strokeAlign;
+    node->effects = effects;
+    node->textStyle = textStyle;
     node->characters = characters;
 }
 
@@ -407,6 +429,62 @@ void EditorState::redo() {
     undoStack.push_back(std::move(e));
     markDocChanged();
     unsaved = true;
+}
+
+void EditorState::alignSelection(Align op) {
+    if (selection.empty()) return;
+    std::vector<NodeProps> before;
+    for (Node* n : selection) before.push_back(NodeProps::capture(n));
+
+    // Target box in world space.
+    WorldRect target;
+    if (selection.size() == 1) {
+        Node* parent = selection[0]->parent;
+        if (!parent || parent->width <= 0 || parent->height <= 0) return;
+        target = worldBounds(*parent);
+    } else {
+        target.x0 = target.y0 = 1e30f;
+        target.x1 = target.y1 = -1e30f;
+        for (Node* n : selection) {
+            const WorldRect b = worldBounds(*n);
+            target.x0 = std::min(target.x0, b.x0);
+            target.y0 = std::min(target.y0, b.y0);
+            target.x1 = std::max(target.x1, b.x1);
+            target.y1 = std::max(target.y1, b.y1);
+        }
+    }
+
+    bool changed = false;
+    for (Node* n : selection) {
+        const WorldRect b = worldBounds(*n);
+        float dx = 0, dy = 0;
+        switch (op) {
+        case Align::Left: dx = target.x0 - b.x0; break;
+        case Align::HCenter:
+            dx = (target.x0 + target.x1) * 0.5f - (b.x0 + b.x1) * 0.5f;
+            break;
+        case Align::Right: dx = target.x1 - b.x1; break;
+        case Align::Top: dy = target.y0 - b.y0; break;
+        case Align::VCenter:
+            dy = (target.y0 + target.y1) * 0.5f - (b.y0 + b.y1) * 0.5f;
+            break;
+        case Align::Bottom: dy = target.y1 - b.y1; break;
+        }
+        if (dx == 0 && dy == 0) continue;
+        // World delta → parent-local delta (parents usually translation-only).
+        float lx = dx, ly = dy;
+        if (n->parent) {
+            if (auto inv = n->parent->absoluteTransform.inverted()) {
+                lx = inv->m00 * dx + inv->m01 * dy;
+                ly = inv->m10 * dx + inv->m11 * dy;
+            }
+        }
+        n->relativeTransform.m02 = std::round(n->relativeTransform.m02 + lx);
+        n->relativeTransform.m12 = std::round(n->relativeTransform.m12 + ly);
+        bumpNode(n);
+        changed = true;
+    }
+    if (changed) pushPropsUndo(std::move(before));
 }
 
 void EditorState::markDocChanged() {

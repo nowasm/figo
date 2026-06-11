@@ -97,6 +97,7 @@ if(FIGMALIB_BACKEND_RAYLIB)
         apps/editor/editor_state.cpp
         apps/editor/editor_canvas.cpp
         apps/editor/editor_panels.cpp
+        apps/editor/editor_inspector.cpp
         apps/editor/editor_dialogs.cpp
     )
     target_include_directories(figmaedit PRIVATE "${raygui_SOURCE_DIR}/src")

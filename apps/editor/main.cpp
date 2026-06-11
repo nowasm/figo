@@ -166,7 +166,20 @@ int main(int argc, char** argv) {
         const std::string file = argc > 2 ? argv[2] : ASSETS_DIR "/sample_ui.json";
         return selftest(file);
     }
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+    // --screenshot <out.png> [file]: render ~40 frames with the first frame
+    // auto-selected, export the framebuffer, exit. Non-interactive UI check.
+    std::string shotPath;
+    int shotArgOffset = 0;
+    if (argc > 2 && std::string(argv[1]) == "--screenshot") {
+        shotPath = argv[2];
+        shotArgOffset = 2;
+    }
+
+    // HIGHDPI gives a crisp physical-resolution framebuffer; screenshot mode
+    // skips it (LoadImageFromScreen misreads the scaled buffer).
+    unsigned flags = FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT;
+    if (shotPath.empty()) flags |= FLAG_WINDOW_HIGHDPI;
+    SetConfigFlags(flags);
     InitWindow(1440, 900, "figmaedit");
     SetExitKey(0);  // Esc is a selection command, not quit
     SetTargetFPS(120);
@@ -174,22 +187,41 @@ int main(int argc, char** argv) {
     figmaedit::initUiFont();
     GuiSetFont(figmaedit::gUiFont);
     GuiSetStyle(DEFAULT, TEXT_SIZE, figmaedit::fontM());
-    // Make the window comfortable on the current monitor.
-    {
+    // Make the window comfortable on the current monitor (not in shot mode,
+    // where the framebuffer must stay at the requested size).
+    if (shotPath.empty()) {
         const int mon = GetCurrentMonitor();
         const int mw = GetMonitorWidth(mon), mh = GetMonitorHeight(mon);
         SetWindowSize(static_cast<int>(mw * 0.85f), static_cast<int>(mh * 0.85f));
         SetWindowPosition(static_cast<int>(mw * 0.06f), static_cast<int>(mh * 0.05f));
     }
 
+    std::fprintf(stderr, "[dpi] screen=%dx%d render=%dx%d scale=%.2f uiScale=%.2f\n",
+                 GetScreenWidth(), GetScreenHeight(), GetRenderWidth(), GetRenderHeight(),
+                 GetWindowScaleDPI().x, gUiScale);
+
     EditorState ed;
-    const std::string initial = argc > 1 ? argv[1] : ASSETS_DIR "/sample_ui.json";
+    const std::string initial =
+        argc > 1 + shotArgOffset ? argv[1 + shotArgOffset] : ASSETS_DIR "/sample_ui.json";
     if (!openFile(ed, initial)) {
         // keep the window open so a file can be dropped in
         ed.setStatus("Drop a .fig / .json file to open", 10);
     }
+    // Test hook: select the first frame at startup (screenshot automation).
+    const char* autoSel = std::getenv("FIGMAEDIT_AUTOSELECT");
+    if ((!shotPath.empty() || (autoSel && *autoSel == '1')) && ed.page &&
+        !ed.page->children.empty()) {
+        ed.selection = {ed.page->children.front().get()};
+    }
 
+    int frameCount = 0;
     while (!WindowShouldClose()) {
+        if (!shotPath.empty() && ++frameCount > 40) {
+            Image shot = LoadImageFromScreen();
+            ExportImage(shot, shotPath.c_str());
+            UnloadImage(shot);
+            break;
+        }
         // drag & drop
         if (IsFileDropped()) {
             FilePathList dropped = LoadDroppedFiles();

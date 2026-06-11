@@ -84,6 +84,11 @@ struct NodeProps {
     float cornerRadius = 0;
     bool visible = true;
     std::vector<figmalib::Paint> fills;
+    std::vector<figmalib::Paint> strokes;
+    float strokeWeight = 1;
+    figmalib::StrokeAlign strokeAlign = figmalib::StrokeAlign::Inside;
+    std::vector<figmalib::Effect> effects;
+    figmalib::TextStyle textStyle;
     std::string characters;
 
     static NodeProps capture(Node* n);
@@ -169,6 +174,7 @@ struct EditorState {
     // ui
     std::unordered_set<Node*> expanded;  // layers tree
     float layersScroll = 0;
+    float inspectorScroll = 0;
     std::string status;
     double statusUntil = 0;
     bool textEditActive = false;      // an inspector textbox owns the keyboard
@@ -196,6 +202,11 @@ struct EditorState {
     void undo();
     void redo();
     void markDocChanged();
+
+    // Figma-style alignment of the selection: single node aligns within its
+    // parent, multi-selection aligns within the selection bounds.
+    enum class Align { Left, HCenter, Right, Top, VCenter, Bottom };
+    void alignSelection(Align op);
 };
 
 // world-space axis-aligned bounds of a node (using absoluteTransform)
