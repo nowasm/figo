@@ -12,15 +12,10 @@ int kLayersW = 260;
 int kInspectorW = 280;
 
 void initUiScale() {
-    // With FLAG_WINDOW_HIGHDPI the reported DPI scale is authoritative;
-    // otherwise infer from the monitor's physical resolution (4K ≈ 2x).
-    const Vector2 dpi = GetWindowScaleDPI();
-    if (dpi.x > 1.05f) {
-        gUiScale = dpi.x;
-    } else {
-        gUiScale = std::max(
-            1.0f, static_cast<float>(GetMonitorWidth(GetCurrentMonitor())) / 1920.0f);
-    }
+    // Window units are physical pixels (GLFW makes the process DPI-aware on
+    // Windows), so scale the UI by the monitor's physical resolution.
+    gUiScale = std::max(
+        1.0f, static_cast<float>(GetMonitorWidth(GetCurrentMonitor())) / 1920.0f);
     gUiScale = std::min(gUiScale, 3.0f);
     if (const char* env = std::getenv("FIGMAEDIT_SCALE"); env && *env) {
         gUiScale = std::max(0.5f, std::min(4.0f, static_cast<float>(std::atof(env))));

@@ -175,11 +175,11 @@ int main(int argc, char** argv) {
         shotArgOffset = 2;
     }
 
-    // HIGHDPI gives a crisp physical-resolution framebuffer; screenshot mode
-    // skips it (LoadImageFromScreen misreads the scaled buffer).
-    unsigned flags = FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT;
-    if (shotPath.empty()) flags |= FLAG_WINDOW_HIGHDPI;
-    SetConfigFlags(flags);
+    // No FLAG_WINDOW_HIGHDPI: GLFW already marks the process DPI-aware on
+    // Windows (window units are physical pixels, no bitmap stretching), and
+    // the flag desyncs raylib's internal scale matrix after SetWindowSize,
+    // pushing the right-hand panels outside the framebuffer.
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(1440, 900, "figmaedit");
     SetExitKey(0);  // Esc is a selection command, not quit
     SetTargetFPS(120);
@@ -187,9 +187,8 @@ int main(int argc, char** argv) {
     figmaedit::initUiFont();
     GuiSetFont(figmaedit::gUiFont);
     GuiSetStyle(DEFAULT, TEXT_SIZE, figmaedit::fontM());
-    // Make the window comfortable on the current monitor (not in shot mode,
-    // where the framebuffer must stay at the requested size).
-    if (shotPath.empty()) {
+    // Make the window comfortable on the current monitor.
+    {
         const int mon = GetCurrentMonitor();
         const int mw = GetMonitorWidth(mon), mh = GetMonitorHeight(mon);
         SetWindowSize(static_cast<int>(mw * 0.85f), static_cast<int>(mh * 0.85f));
@@ -216,11 +215,18 @@ int main(int argc, char** argv) {
 
     int frameCount = 0;
     while (!WindowShouldClose()) {
-        if (!shotPath.empty() && ++frameCount > 40) {
-            Image shot = LoadImageFromScreen();
-            ExportImage(shot, shotPath.c_str());
-            UnloadImage(shot);
-            break;
+        if (!shotPath.empty()) {
+            // Deterministic screenshot: keep the first frame selected even if
+            // stray real-mouse input lands in the window.
+            if (ed.page && !ed.page->children.empty()) {
+                ed.selection = {ed.page->children.front().get()};
+            }
+            if (++frameCount > 40) {
+                Image shot = LoadImageFromScreen();
+                ExportImage(shot, shotPath.c_str());
+                UnloadImage(shot);
+                break;
+            }
         }
         // drag & drop
         if (IsFileDropped()) {
