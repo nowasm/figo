@@ -115,6 +115,9 @@ public:
     // that name (so a click on a button's label still triggers the button).
     void onClick(const std::string& nodeName, ClickHandler fn);
     void onHover(const std::string& nodeName, HoverHandler fn);
+    // Drop every registered click/hover handler. Script hot reload uses this
+    // before re-running a script that re-registers its handlers.
+    void clearHandlers();
 
     // ---- Text editing ----
     // A TEXT node marked editable receives focus when clicked (caret at the

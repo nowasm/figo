@@ -1,13 +1,24 @@
 #include "figmalib/script.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <quickjs.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winhttp.h>
+#endif
 
 #include "figmalib/document.h"
 #include "figmalib/ui.h"
@@ -60,6 +71,113 @@ FigmaUI::Transition parseTransition(const std::string& s) {
     return FigmaUI::Transition::None;
 }
 
+// ---- fetch: background worker + main-thread result queue ----
+
+struct FetchResult {
+    uint64_t id = 0;
+    int status = 0;
+    std::string body;
+    std::string error;  // non-empty → reject
+};
+
+// Shared with worker threads; may outlive the ScriptHost (results are then
+// simply never drained).
+struct FetchQueue {
+    std::mutex mutex;
+    std::vector<FetchResult> results;
+};
+
+#ifdef _WIN32
+
+std::wstring widen(const std::string& s) {
+    if (s.empty()) return {};
+    const int n =
+        MultiByteToWideChar(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), nullptr, 0);
+    std::wstring w(static_cast<size_t>(n), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), w.data(), n);
+    return w;
+}
+
+void fetchWorker(std::shared_ptr<FetchQueue> queue, uint64_t id, std::string url,
+                 std::string method, std::string headers, std::string body) {
+    FetchResult res;
+    res.id = id;
+    HINTERNET ses = nullptr, con = nullptr, req = nullptr;
+    auto finish = [&] {
+        if (req) WinHttpCloseHandle(req);
+        if (con) WinHttpCloseHandle(con);
+        if (ses) WinHttpCloseHandle(ses);
+        std::lock_guard<std::mutex> lock(queue->mutex);
+        queue->results.push_back(std::move(res));
+    };
+    auto fail = [&](const char* what) {
+        res.error = std::string(what) + " (code " + std::to_string(GetLastError()) + ")";
+        finish();
+    };
+
+    const std::wstring wurl = widen(url);
+    URL_COMPONENTS uc{};
+    uc.dwStructSize = sizeof(uc);
+    wchar_t host[256] = {}, path[2048] = {};
+    uc.lpszHostName = host;
+    uc.dwHostNameLength = 255;
+    uc.lpszUrlPath = path;
+    uc.dwUrlPathLength = 2047;
+    if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &uc)) return fail("bad url");
+
+    ses = WinHttpOpen(L"figmalib/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!ses) return fail("WinHttpOpen");
+    con = WinHttpConnect(ses, host, uc.nPort, 0);
+    if (!con) return fail("connect");
+    const bool https = uc.nScheme == INTERNET_SCHEME_HTTPS;
+    req = WinHttpOpenRequest(con, widen(method).c_str(), path, nullptr, WINHTTP_NO_REFERER,
+                             WINHTTP_DEFAULT_ACCEPT_TYPES, https ? WINHTTP_FLAG_SECURE : 0);
+    if (!req) return fail("open request");
+
+    const std::wstring whdrs = widen(headers);
+    if (!WinHttpSendRequest(req,
+                            whdrs.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : whdrs.c_str(),
+                            whdrs.empty() ? 0 : static_cast<DWORD>(whdrs.size()),
+                            body.empty() ? WINHTTP_NO_REQUEST_DATA
+                                         : const_cast<char*>(body.data()),
+                            static_cast<DWORD>(body.size()),
+                            static_cast<DWORD>(body.size()), 0)) {
+        return fail("send");
+    }
+    if (!WinHttpReceiveResponse(req, nullptr)) return fail("receive");
+
+    DWORD status = 0, sz = sizeof(status);
+    WinHttpQueryHeaders(req, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                        WINHTTP_HEADER_NAME_BY_INDEX, &status, &sz, WINHTTP_NO_HEADER_INDEX);
+    res.status = static_cast<int>(status);
+
+    for (;;) {
+        DWORD avail = 0;
+        if (!WinHttpQueryDataAvailable(req, &avail)) return fail("read");
+        if (avail == 0) break;
+        const size_t at = res.body.size();
+        res.body.resize(at + avail);
+        DWORD got = 0;
+        if (!WinHttpReadData(req, res.body.data() + at, avail, &got)) return fail("read");
+        res.body.resize(at + got);
+    }
+    finish();
+}
+
+#else
+
+void fetchWorker(std::shared_ptr<FetchQueue> queue, uint64_t id, std::string, std::string,
+                 std::string, std::string) {
+    FetchResult res;
+    res.id = id;
+    res.error = "fetch is not supported on this platform yet";
+    std::lock_guard<std::mutex> lock(queue->mutex);
+    queue->results.push_back(std::move(res));
+}
+
+#endif
+
 }  // namespace
 
 struct ScriptHost::Impl {
@@ -72,7 +190,90 @@ struct ScriptHost::Impl {
     std::vector<JSValue> retained;
     std::vector<JSValue> updateFns;
 
+    // setTimeout/setInterval, driven by update(dt)'s accumulated clock.
+    struct Timer {
+        int64_t id;
+        double due;          // clock seconds
+        double intervalSec;  // repeat period (setInterval)
+        bool repeat;
+        JSValue fn;
+    };
+    double clock = 0;
+    int64_t nextTimerId = 1;
+    std::vector<Timer> timers;
+
+    // fetch: worker threads push results; update() resolves the promises.
+    std::shared_ptr<FetchQueue> fetchQueue = std::make_shared<FetchQueue>();
+    uint64_t nextFetchId = 1;
+    struct PendingFetch {
+        JSValue resolve, reject;
+    };
+    std::unordered_map<uint64_t, PendingFetch> pendingFetch;
+
     explicit Impl(FigmaUI& u) : ui(u) {}
+
+    void fireDueTimers() {
+        std::vector<JSValue> fire;
+        for (auto it = timers.begin(); it != timers.end();) {
+            if (clock >= it->due) {
+                fire.push_back(JS_DupValue(ctx, it->fn));
+                if (it->repeat) {
+                    it->due += it->intervalSec;
+                    if (it->due <= clock) it->due = clock + it->intervalSec;
+                    ++it;
+                } else {
+                    JS_FreeValue(ctx, it->fn);
+                    it = timers.erase(it);
+                }
+            } else {
+                ++it;
+            }
+        }
+        for (JSValue f : fire) {  // callbacks may add/clear timers freely now
+            JSValue r = JS_Call(ctx, f, JS_UNDEFINED, 0, nullptr);
+            if (JS_IsException(r)) dumpError();
+            JS_FreeValue(ctx, r);
+            JS_FreeValue(ctx, f);
+        }
+    }
+
+    void clearTimer(int64_t id) {
+        for (auto it = timers.begin(); it != timers.end(); ++it) {
+            if (it->id == id) {
+                JS_FreeValue(ctx, it->fn);
+                timers.erase(it);
+                return;
+            }
+        }
+    }
+
+    void drainFetchResults() {
+        std::vector<FetchResult> done;
+        {
+            std::lock_guard<std::mutex> lock(fetchQueue->mutex);
+            done.swap(fetchQueue->results);
+        }
+        for (FetchResult& r : done) {
+            auto it = pendingFetch.find(r.id);
+            if (it == pendingFetch.end()) continue;
+            PendingFetch p = it->second;
+            pendingFetch.erase(it);
+            if (r.error.empty()) {
+                JSValue obj = JS_NewObject(ctx);
+                JS_SetPropertyStr(ctx, obj, "status", JS_NewInt32(ctx, r.status));
+                JS_SetPropertyStr(ctx, obj, "ok",
+                                  JS_NewBool(ctx, r.status >= 200 && r.status < 300));
+                JS_SetPropertyStr(ctx, obj, "body",
+                                  JS_NewStringLen(ctx, r.body.data(), r.body.size()));
+                callVoid(p.resolve, 1, &obj);
+            } else {
+                JSValue err = JS_NewString(ctx, r.error.c_str());
+                callVoid(p.reject, 1, &err);
+            }
+            JS_FreeValue(ctx, p.resolve);
+            JS_FreeValue(ctx, p.reject);
+        }
+    }
 
     static Impl* from(JSContext* c) {
         return static_cast<Impl*>(JS_GetContextOpaque(c));
@@ -486,6 +687,53 @@ JSValue ui_tap(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     return JS_NewBool(ctx, true);
 }
 
+// setTimeout / setInterval (magic: 0 = once, 1 = repeat) -> timer id.
+JSValue js_setTimer(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv, int magic) {
+    auto* im = ScriptHost::Impl::from(ctx);
+    if (argc < 1 || !JS_IsFunction(ctx, argv[0])) {
+        return JS_ThrowTypeError(ctx, "function expected");
+    }
+    double ms = 0;
+    if (argc >= 2 && JS_ToFloat64(ctx, &ms, argv[1])) return JS_EXCEPTION;
+    if (ms < 0) ms = 0;
+    ScriptHost::Impl::Timer t;
+    t.id = im->nextTimerId++;
+    t.intervalSec = ms / 1000.0;
+    t.due = im->clock + t.intervalSec;
+    t.repeat = magic == 1;
+    t.fn = JS_DupValue(ctx, argv[0]);
+    im->timers.push_back(t);
+    return JS_NewInt64(ctx, t.id);
+}
+
+JSValue js_clearTimer(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv, int) {
+    auto* im = ScriptHost::Impl::from(ctx);
+    int64_t id = 0;
+    if (argc < 1 || JS_ToInt64(ctx, &id, argv[0])) return JS_UNDEFINED;
+    im->clearTimer(id);
+    return JS_UNDEFINED;
+}
+
+// __fetch(url, method, headersCRLF, body) -> Promise<{status, ok, body}>.
+// The standard fetch(url, opts) wrapper is defined in the JS prelude.
+JSValue js_fetchNative(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    auto* im = ScriptHost::Impl::from(ctx);
+    std::string url, method, headers, body;
+    if (argc < 4 || !argName(ctx, argv[0], url) || !argName(ctx, argv[1], method) ||
+        !argName(ctx, argv[2], headers) || !argName(ctx, argv[3], body)) {
+        return JS_EXCEPTION;
+    }
+    JSValue funcs[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, funcs);
+    if (JS_IsException(promise)) return promise;
+    const uint64_t id = im->nextFetchId++;
+    im->pendingFetch[id] = {funcs[0], funcs[1]};
+    std::thread(fetchWorker, im->fetchQueue, id, std::move(url), std::move(method),
+                std::move(headers), std::move(body))
+        .detach();
+    return promise;
+}
+
 JSValue js_consoleLog(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     std::string line;
     for (int i = 0; i < argc; ++i) {
@@ -579,15 +827,56 @@ ScriptHost::ScriptHost(FigmaUI& ui) : impl_(std::make_unique<Impl>(ui)) {
     JS_SetPropertyStr(ctx, consoleObj, "error",
                       JS_NewCFunction(ctx, js_consoleLog, "error", 1));
     JS_SetPropertyStr(ctx, global, "console", consoleObj);
+
+    // Timers + fetch.
+    JS_SetPropertyStr(ctx, global, "setTimeout",
+                      JS_NewCFunctionMagic(ctx, js_setTimer, "setTimeout", 2,
+                                           JS_CFUNC_generic_magic, 0));
+    JS_SetPropertyStr(ctx, global, "setInterval",
+                      JS_NewCFunctionMagic(ctx, js_setTimer, "setInterval", 2,
+                                           JS_CFUNC_generic_magic, 1));
+    JS_SetPropertyStr(ctx, global, "clearTimeout",
+                      JS_NewCFunctionMagic(ctx, js_clearTimer, "clearTimeout", 1,
+                                           JS_CFUNC_generic_magic, 0));
+    JS_SetPropertyStr(ctx, global, "clearInterval",
+                      JS_NewCFunctionMagic(ctx, js_clearTimer, "clearInterval", 1,
+                                           JS_CFUNC_generic_magic, 0));
+    JS_SetPropertyStr(ctx, global, "__fetch",
+                      JS_NewCFunction(ctx, js_fetchNative, "__fetch", 4));
     JS_FreeValue(ctx, global);
+
+    // fetch(url, opts) on top of __fetch: flatten headers, wrap the response.
+    eval(R"JS(
+globalThis.fetch = (url, opts) => {
+    opts = opts || {};
+    const headers = Object.entries(opts.headers || {})
+        .map(([k, v]) => k + ": " + v).join("\r\n");
+    return __fetch(String(url), String(opts.method || "GET"), headers,
+                   opts.body == null ? "" : String(opts.body))
+        .then((r) => ({
+            status: r.status,
+            ok: r.ok,
+            text: () => r.body,
+            json: () => JSON.parse(r.body),
+        }));
+};
+)JS",
+         "<prelude>");
 }
 
 ScriptHost::~ScriptHost() {
     auto& d = *impl_;
     for (JSValue v : d.retained) JS_FreeValue(d.ctx, v);
     for (JSValue v : d.updateFns) JS_FreeValue(d.ctx, v);
+    for (auto& t : d.timers) JS_FreeValue(d.ctx, t.fn);
+    for (auto& [id, p] : d.pendingFetch) {
+        JS_FreeValue(d.ctx, p.resolve);
+        JS_FreeValue(d.ctx, p.reject);
+    }
     JS_FreeContext(d.ctx);
     JS_FreeRuntime(d.rt);
+    // In-flight fetch threads keep the queue alive via shared_ptr and finish
+    // harmlessly; their results are never drained.
 }
 
 bool ScriptHost::eval(const std::string& source, const std::string& filename) {
@@ -613,10 +902,13 @@ bool ScriptHost::runFile(const std::string& path) {
 
 void ScriptHost::update(float dtSeconds) {
     auto& d = *impl_;
+    d.clock += dtSeconds;
+    d.fireDueTimers();
     for (JSValue fn : d.updateFns) {
         JSValue arg = JS_NewFloat64(d.ctx, dtSeconds);
         d.callVoid(fn, 1, &arg);
     }
+    d.drainFetchResults();
     JSContext* c = nullptr;
     while (JS_ExecutePendingJob(d.rt, &c) > 0) {
     }

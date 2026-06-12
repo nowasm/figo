@@ -28,6 +28,11 @@
 //   node.find(name) -> node|null
 //   node.primarySizing = "hug"|"fixed"   node.primaryAlign = "min"|"center"|
 //                                        "max"|"spaceBetween"   (auto-layout)
+// Also available:
+//   setTimeout(fn, ms) / setInterval(fn, ms) -> id, clearTimeout/clearInterval
+//     (driven by update(dt) — they tick in app time, pausing with the host)
+//   fetch(url, {method, headers, body}?) -> Promise<{status, ok, text(), json()}>
+//     (background thread; the promise settles on the next update(dt))
 
 #include <memory>
 #include <string>

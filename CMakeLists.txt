@@ -93,6 +93,9 @@ if(FIGMALIB_SCRIPTING)
 
     add_library(figmalib_script STATIC src/script_host.cpp)
     target_link_libraries(figmalib_script PUBLIC figmalib qjs)
+    if(WIN32)
+        target_link_libraries(figmalib_script PRIVATE winhttp)  # fetch()
+    endif()
 endif()
 
 # ---- raylib backend ----

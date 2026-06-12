@@ -98,4 +98,18 @@ if (globalThis.SELFDRIVE) {
         const row = list && list.childCount > 1 ? list.child(1) : null;
         console.log("selfdrive tap ->", ui.tap(row || "Card"));
     });
+
+    // Timer + fetch smoke tests (results show up in the selfdrive log).
+    let ticks = 0;
+    const iv = setInterval(() => {
+        if (++ticks === 3) {
+            clearInterval(iv);
+            console.log("interval ticked 3x, then cleared");
+        }
+    }, 100);
+    setTimeout(() => console.log("timeout fired at ~250ms"), 250);
+    fetch("https://example.com")
+        .then((r) => console.log("fetch:", r.status, "ok =", r.ok,
+                                 "body bytes =", r.text().length))
+        .catch((e) => console.log("fetch error:", String(e)));
 }

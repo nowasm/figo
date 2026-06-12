@@ -880,6 +880,11 @@ void FigmaUI::onHover(const std::string& nodeName, HoverHandler fn) {
     impl_->hoverHandlers[nodeName].push_back(std::move(fn));
 }
 
+void FigmaUI::clearHandlers() {
+    impl_->clickHandlers.clear();
+    impl_->hoverHandlers.clear();
+}
+
 bool FigmaUI::bindList(const std::string& listName, size_t count,
                        const ListBinder& bind) {
     Node* list = impl_->findMutable(listName);

@@ -5,10 +5,14 @@
 // All behavior lives in the script (see figmalib/script.h for the JS API);
 // this host only loads the two files and runs the frame loop. With no
 // arguments it plays the wallet demo (examples/demo_script/wallet.js).
+// The script hot-reloads: save the .js and the running app rebuilds its
+// script world in place (design/document state stays).
 // --selfdrive defines globalThis.SELFDRIVE for the script (which drives its
 // own tour, e.g. tapping into a coin) and saves <prefix>_home/nav.png.
 
 #include <cstdio>
+#include <filesystem>
+#include <memory>
 #include <string>
 
 #include <raylib.h>
@@ -46,22 +50,44 @@ int main(int argc, char** argv) {
     InitWindow(420, 900, "figmaplay — design.fig + logic.js");
 
     auto ui = figmalib::FigmaUI::fromFile(design);
-    figmalib::ScriptHost host(*ui);
-    if (drivePrefix) host.eval("globalThis.SELFDRIVE = true;", "<selfdrive>");
-    if (!host.runFile(script)) {
+    std::unique_ptr<figmalib::ScriptHost> host;
+    const auto loadScript = [&] {
+        ui->clearHandlers();  // the script re-registers everything it needs
+        host = std::make_unique<figmalib::ScriptHost>(*ui);
+        if (drivePrefix) host->eval("globalThis.SELFDRIVE = true;", "<selfdrive>");
+        const bool ok = host->runFile(script);
+        ui->markDirty();
+        return ok;
+    };
+    if (!loadScript()) {
         CloseWindow();
         return 1;
     }
 
+    // Hot reload: rebuild the script world when the .js changes on disk.
+    std::error_code fsEc;
+    auto scriptStamp = std::filesystem::last_write_time(script, fsEc);
+
     figmalib::RaylibFigmaView view(*ui);
     int frame = 0;
+    int watchTick = 0;
     while (!WindowShouldClose()) {
+        if (++watchTick >= 20) {  // ~3x per second
+            watchTick = 0;
+            const auto now = std::filesystem::last_write_time(script, fsEc);
+            if (!fsEc && now != scriptStamp) {
+                scriptStamp = now;
+                std::printf("[figmaplay] reloading %s\n", script.c_str());
+                std::fflush(stdout);
+                loadScript();
+            }
+        }
         if ((IsKeyPressed(KEY_BACKSPACE) && !ui->focusedNode()) ||
             IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
             ui->navigateBack();
         }
         view.resize(GetScreenWidth(), GetScreenHeight());
-        host.update(GetFrameTime());  // fires ui.onUpdate handlers
+        host->update(GetFrameTime());  // timers, onUpdate, fetch results
         view.update();
 
         BeginDrawing();
