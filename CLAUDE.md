@@ -53,3 +53,10 @@ Set-Content build\bw.cmd $bat -Encoding ascii; cmd /c "D:\work_open\figmalib\bui
   （ScrollBinding 变换重定向 / 后端贴图合成），性能敏感改动先看 `src/renderer.cpp`。
 - .fig 输入靠 fig2json（`D:\work_open\fig2json`，Rust）转 canvas.json，缓存于
   `<file>.fig.export/`；测试素材在 `D:\work_open\fig2psd\test\figma\`（wallet.fig 最全）。
+- Web 验证：渲染用 `msedge --headless=new --timeout=30000 --screenshot=...`
+  （`--virtual-time-budget` 会在 wasm 首帧前触发，不可用）；输入/日志用
+  `tools/web_test/`（serve.py 的 /slow 拖住 load 事件让 --dump-dom 晚截，
+  clicktest.html 派发真实 DOM 鼠标事件——**mousedown/up 必须隔几百 ms**，
+  同一帧间隙内会在 raylib 的状态轮询中互相抵消）。Web 画布固定 420x900：
+  raylib 的 RESIZABLE 在 web 上会造成 framebuffer/canvas 属性/CSS 三方尺寸
+  不一致，GLFW shim 鼠标坐标错位（点击全部偏移）。

@@ -194,7 +194,16 @@ int main(int argc, char** argv) {
     }
 #endif
 
+#ifdef __EMSCRIPTEN__
+    // No RESIZABLE on the web: raylib would track the browser window size
+    // while the GLFW shim keeps scaling mouse coords by the canvas element's
+    // original width/height attributes — every click lands off-target. A
+    // fixed phone-sized canvas keeps framebuffer, element and CSS sizes (and
+    // therefore input mapping) identical.
+    SetConfigFlags(FLAG_VSYNC_HINT);
+#else
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+#endif
     InitWindow(420, 900, "figmaplay — design.fig + logic.js");
 
 #ifdef __ANDROID__
