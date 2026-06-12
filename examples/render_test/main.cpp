@@ -397,7 +397,9 @@ int main(int argc, char** argv) {
             ++failures;
         } else {
             const bool idBumped = ui->transitionId() != idBefore;
-            ui->update(0.15f);  // halfway
+            // The animation clock clamps each tick to 1/30 s, so step in
+            // frame-sized increments like a real host would.
+            for (int i = 0; i < 5; ++i) ui->update(1.0f / 30);  // ~halfway
             const bool midAnimating = ui->animating();
             const float midProgress = ui->transitionProgress();
             ui->render();
@@ -405,7 +407,7 @@ int main(int argc, char** argv) {
             for (uint32_t i = 0; i < total; ++i) {
                 if (ui->pixels()[i] != b[i]) ++midDiffB;
             }
-            ui->update(0.5f);  // finish
+            for (int i = 0; i < 20; ++i) ui->update(1.0f / 30);  // finish
             const bool doneAnimating = ui->animating();
             const bool backOk =
                 ui->canGoBack() && ui->navigateBack(0.0f) && ui->currentFrame() &&

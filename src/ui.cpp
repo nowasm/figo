@@ -362,6 +362,7 @@ struct FigmaUI::Impl {
     float transElapsed = 0, transDuration = 0;
     float transProgress = 0;  // eased, consumed by the backend compositor
     uint32_t transId = 0;     // bumped per navigation → backend snapshots
+    float transBandTop = -1;  // frame-local top of shared bottom chrome; <0 none
 
     Node* findFrame(const std::string& nameOrId) {
         for (Node* f : doc->topLevelFrames()) {
@@ -403,6 +404,37 @@ struct FigmaUI::Impl {
         transElapsed = 0;
         transDuration = duration;
         transProgress = 0;
+        findStaticBottomChrome(from);
+    }
+
+    // Native tab-bar semantics: bottom-anchored scrollFixed top-level
+    // elements present in both frames with the same name and geometry form a
+    // band that stays put while the pages slide. Full-frame fixed overlays
+    // (status bars span from y=0) are excluded via the lower-half test.
+    void findStaticBottomChrome(Node* from) {
+        transBandTop = -1;
+        if (!frame || !from) return;
+        for (const auto& c : frame->children) {
+            if (!c->scrollFixed || !c->effectivelyVisible()) continue;
+            const float cy = c->relativeTransform.m12;
+            if (cy < frame->height * 0.5f) continue;           // bottom chrome only
+            if (cy + c->height < frame->height - 4) continue;  // anchored to the bottom
+            Node* o = nullptr;
+            for (const auto& fc : from->children) {
+                if (fc->name == c->name) {
+                    o = fc.get();
+                    break;
+                }
+            }
+            if (!o || !o->scrollFixed || !o->effectivelyVisible()) continue;
+            if (std::abs(o->relativeTransform.m02 - c->relativeTransform.m02) > 1.5f ||
+                std::abs(o->relativeTransform.m12 - cy) > 1.5f ||
+                std::abs(o->width - c->width) > 1.5f ||
+                std::abs(o->height - c->height) > 1.5f) {
+                continue;
+            }
+            transBandTop = transBandTop < 0 ? cy : std::min(transBandTop, cy);
+        }
     }
 
     // Maps an authored Figma transition type onto our animation set.
@@ -514,6 +546,10 @@ bool FigmaUI::canGoBack() const { return !impl_->navStack.empty(); }
 
 void FigmaUI::update(float dtSeconds) {
     if (dtSeconds <= 0) return;
+    // Animation clock, not wall clock: a hitch (e.g. the incoming frame's
+    // first scene build can take hundreds of ms) consumes one slow tick of
+    // the animation instead of swallowing the whole transition.
+    dtSeconds = std::min(dtSeconds, 1.0f / 30.0f);
     impl_->stepScrollAnims(dtSeconds);
     if (!impl_->transFrom) return;
     impl_->transElapsed += dtSeconds;
@@ -537,6 +573,14 @@ FigmaUI::Transition FigmaUI::transitionType() const {
 
 float FigmaUI::transitionProgress() const {
     return impl_->transFrom ? impl_->transProgress : 1.0f;
+}
+
+float FigmaUI::transitionStaticBottomY() const {
+    const float full = static_cast<float>(impl_->renderer.height());
+    if (!impl_->transFrom || !impl_->frame || impl_->transBandTop < 0) return full;
+    float x, y;
+    impl_->renderer.contentTransform().apply(0, impl_->transBandTop, x, y);
+    return std::min(full, y);
 }
 
 Node* FigmaUI::currentFrame() const { return impl_->frame; }

@@ -180,6 +180,7 @@ int main(int argc, char** argv) {
     bool quit = false;
 
     figmalib::Node* lastFrameNode = ui->currentFrame();
+    bool tabShotDone = false;
     while (!WindowShouldClose() && !quit) {
         if (ui->currentFrame() != lastFrameNode) {
             std::printf("[frame] -> %s\n", ui->currentFrame()->name.c_str());
@@ -329,6 +330,18 @@ int main(int argc, char** argv) {
                 } else {
                     std::printf("Discover nav item not found\n");
                 }
+            } else if (frame > 240 && frame < 278 && !tabShotDone && ui->animating() &&
+                       ui->transitionProgress() > 0.15f &&
+                       ui->transitionProgress() < 0.85f) {
+                // Mid Home -> Discover (progress-gated: frame counting is not
+                // reliable when the window runs unfocused): both frames share
+                // the Bottom Nav Bar, so it must hold still while the pages
+                // slide above it.
+                tabShotDone = true;
+                std::printf("tabswap: p=%.2f staticBottomY=%.1f h=%u\n",
+                            ui->transitionProgress(), ui->transitionStaticBottomY(),
+                            ui->pixelHeight());
+                shot("tabswap");
             } else if (frame == 280) {
                 // The reported bounce: on the Discover page, tap Trade.
                 figmalib::Node* item = nullptr;

@@ -63,6 +63,15 @@ public:
     Transition transitionType() const;
     float transitionProgress() const;  // eased, [0,1)
 
+    // Persistent bottom chrome (native tab-bar semantics): viewport-space Y
+    // of the top edge of bottom-anchored scrollFixed top-level elements that
+    // exist in BOTH frames with identical name and geometry. The backend
+    // draws the band [y, height) statically from the incoming texture while
+    // the pages slide above it. Returns the full height when idle or when
+    // the frames share no such chrome (e.g. navigating into a detail page —
+    // then the whole page slides, which is the native behavior too).
+    float transitionStaticBottomY() const;
+
     // ---- Render ----
     // How the frame follows the viewport size:
     //   Scale  — uniform scale-to-fit, letterboxed (default; authored layout)

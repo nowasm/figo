@@ -179,17 +179,19 @@ void RaylibFigmaView::draw(int x, int y, ::Color tint) const {
     if (!curOk) return;
     const Texture2D& cur = gpuActive_ ? rt_.texture : texture_;
 
-    // FBO color attachments are bottom-up in GL: draw with a flipped source
-    // rect (the usual raylib RenderTexture convention).
-    auto src = [this](const Texture2D& t) {
-        return Rectangle{0, 0, static_cast<float>(t.width),
-                         gpuActive_ ? -static_cast<float>(t.height)
-                                    : static_cast<float>(t.height)};
+    // Source rect for the image-space band [top, top+bh). FBO color
+    // attachments are bottom-up in GL: select the mirrored row range and draw
+    // it flipped (negative height, the usual raylib RenderTexture convention).
+    auto srcBand = [this](const Texture2D& t, float top, float bh) {
+        return gpuActive_ ? Rectangle{0, static_cast<float>(t.height) - top - bh,
+                                      static_cast<float>(t.width), -bh}
+                          : Rectangle{0, top, static_cast<float>(t.width), bh};
     };
     const float fx = static_cast<float>(x), fy = static_cast<float>(y);
+    const float h = static_cast<float>(cur.height);
 
     if (!ui_.animating() || !prevValid_) {
-        DrawTextureRec(cur, src(cur), {fx, fy}, tint);
+        DrawTextureRec(cur, srcBand(cur, 0, h), {fx, fy}, tint);
         return;
     }
 
@@ -198,7 +200,6 @@ void RaylibFigmaView::draw(int x, int y, ::Color tint) const {
     const Texture2D& prev = gpuActive_ ? rtPrev_.texture : prevTexture_;
     const float p = ui_.transitionProgress();
     const float w = static_cast<float>(cur.width);
-    const float h = static_cast<float>(cur.height);
     float inX = 0, inY = 0, outX = 0, outY = 0;
     ::Color inTint = tint;
     switch (ui_.transitionType()) {
@@ -210,8 +211,17 @@ void RaylibFigmaView::draw(int x, int y, ::Color tint) const {
         inTint.a = static_cast<unsigned char>(tint.a * p);
         break;
     }
-    DrawTextureRec(prev, src(prev), {fx + outX, fy + outY}, tint);
-    DrawTextureRec(cur, src(cur), {fx + inX, fy + inY}, inTint);
+
+    // Shared bottom chrome (tab bar in both frames) stays put: the pages
+    // slide cropped above the band, the band renders statically on top from
+    // the incoming texture (its tab highlight switches immediately — native
+    // behavior).
+    const float bandY = std::min(ui_.transitionStaticBottomY(), h);
+    DrawTextureRec(prev, srcBand(prev, 0, bandY), {fx + outX, fy + outY}, tint);
+    DrawTextureRec(cur, srcBand(cur, 0, bandY), {fx + inX, fy + inY}, inTint);
+    if (bandY < h - 0.5f) {
+        DrawTextureRec(cur, srcBand(cur, bandY, h - bandY), {fx, fy + bandY}, tint);
+    }
 }
 
 }  // namespace figmalib
