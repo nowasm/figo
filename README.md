@@ -246,6 +246,21 @@ GET https://api.figma.com/v1/files/<FILE_KEY>?geometry=paths
   constraints/stack 字段）；旧缓存会因 fig2json 更新自动重新转换。
   `layout_test.exe` 为布局数学的无窗口自测。
 
+## Web 构建（emscripten）
+
+wallet demo 可编译为 wasm 在浏览器运行（CPU 光栅化 → WebGL 上屏）：
+
+```
+tools\build_thorvg_wasm.cmd    # ThorVG wasm 静态库（sw 引擎、无线程、无 lottie）
+tools\build_web.cmd            # 产出 build_web\figmaplay.{html,js,wasm,data}
+python -m http.server 8123 -d build_web   # 打开 http://localhost:8123/figmaplay.html
+```
+
+emsdk 默认在 `D:\devlib\emsdk`（`EMSDK_HOME` 覆盖）。设计以预转换的
+canvas.json + images 打包进虚拟文件系统（.fig 转换是原生步骤），字体打包自
+`examples/assets/fonts`（浏览器没有系统字体，wallet 用的 Titillium Web/Poppins
+已内置）。限制：web 上 fetch 暂为 stub，热重载/`--shot` 仅桌面有效。
+
 ## GPU 渲染
 
 引擎后端可以让 ThorVG 的 GL 引擎直接渲染进自己的 FBO（零 CPU 像素拷贝）：

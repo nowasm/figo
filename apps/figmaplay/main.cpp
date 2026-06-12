@@ -15,6 +15,10 @@
 //                                first (globalThis.SHOT is defined).
 //   --selfdrive prefix           the script drives its own tour (SELFDRIVE is
 //                                defined); saves <prefix>_home/nav.png.
+//
+// Web build (emscripten): the design ships pre-converted (canvas.json +
+// images) in the preloaded FS together with the script and fonts — see the
+// EMSCRIPTEN defaults below and the figmaplay target in CMakeLists.txt.
 
 #include <cstdio>
 #include <cstdlib>
@@ -28,41 +32,27 @@
 #include <figmalib/script.h>
 #include <figmalib_raylib.h>
 
-int main(int argc, char** argv) {
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
+namespace {
+
+struct Player {
     std::string design, script, shotPath;
     const char* drivePrefix = nullptr;
     int shotFrames = 30;
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
-        if (arg == "--selfdrive" && i + 1 < argc) drivePrefix = argv[++i];
-        else if (arg == "--shot" && i + 1 < argc) shotPath = argv[++i];
-        else if (arg == "--frames" && i + 1 < argc) shotFrames = std::atoi(argv[++i]);
-        else if (arg.size() > 3 && arg.compare(arg.size() - 3, 3, ".js") == 0) script = arg;
-        else design = arg;
-    }
-    if (design.empty()) {
-        for (const char* cand : {"wallet.fig", "../wallet.fig",
-                                 "D:/work_open/fig2psd/test/figma/wallet.fig"}) {
-            if (FILE* f = fopen(cand, "rb")) {
-                fclose(f);
-                design = cand;
-                break;
-            }
-        }
-    }
-    if (script.empty()) script = std::string(EXAMPLES_DIR) + "/scripts/wallet.js";
-    if (design.empty()) {
-        std::printf("usage: figmaplay [design.fig] [logic.js] [--selfdrive prefix] "
-                    "[--shot out.png] [--frames N]\n");
-        return 1;
-    }
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-    InitWindow(420, 900, "figmaplay — design.fig + logic.js");
-
-    auto ui = figmalib::FigmaUI::fromFile(design);
+    std::unique_ptr<figmalib::FigmaUI> ui;
     std::unique_ptr<figmalib::ScriptHost> host;
-    const auto loadScript = [&] {
+    std::unique_ptr<figmalib::RaylibFigmaView> view;
+    std::filesystem::file_time_type scriptStamp;
+    std::error_code fsEc;
+    int frame = 0;
+    int watchTick = 0;
+    bool done = false;
+
+    bool loadScript() {
         ui->clearHandlers();  // the script re-registers everything it needs
         host = std::make_unique<figmalib::ScriptHost>(*ui);
         host->setStoragePath(script + ".storage.json");
@@ -71,20 +61,10 @@ int main(int argc, char** argv) {
         const bool ok = host->runFile(script);
         ui->markDirty();
         return ok;
-    };
-    if (!loadScript()) {
-        CloseWindow();
-        return 1;
     }
 
-    // Hot reload: rebuild the script world when the .js changes on disk.
-    std::error_code fsEc;
-    auto scriptStamp = std::filesystem::last_write_time(script, fsEc);
-
-    figmalib::RaylibFigmaView view(*ui);
-    int frame = 0;
-    int watchTick = 0;
-    while (!WindowShouldClose()) {
+    void tick() {
+        // Hot reload: rebuild the script world when the .js changes on disk.
         if (++watchTick >= 20) {  // ~3x per second
             watchTick = 0;
             const auto now = std::filesystem::last_write_time(script, fsEc);
@@ -99,20 +79,20 @@ int main(int argc, char** argv) {
             IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
             ui->navigateBack();
         }
-        view.resize(GetScreenWidth(), GetScreenHeight());
+        view->resize(GetScreenWidth(), GetScreenHeight());
         host->update(GetFrameTime());  // timers, onUpdate, fetch results
-        view.update();
+        view->update();
 
         BeginDrawing();
         ClearBackground(Color{12, 14, 18, 255});
-        view.draw();
+        view->draw();
         EndDrawing();
 
         if (!shotPath.empty()) {
             if (++frame >= shotFrames) {
                 TakeScreenshot(shotPath.c_str());
                 std::printf("[figmaplay] screenshot -> %s\n", shotPath.c_str());
-                break;
+                done = true;
             }
         } else if (drivePrefix) {
             ++frame;
@@ -121,10 +101,75 @@ int main(int argc, char** argv) {
             } else if (frame == 110) {
                 TakeScreenshot((std::string(drivePrefix) + "_nav.png").c_str());
             } else if (frame >= 140) {
+                done = true;
+            }
+        }
+    }
+};
+
+Player* g_player = nullptr;
+
+#ifdef __EMSCRIPTEN__
+void emFrame() { g_player->tick(); }
+#endif
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    auto* p = new Player();  // outlives main on the web (set_main_loop unwinds)
+    g_player = p;
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--selfdrive" && i + 1 < argc) p->drivePrefix = argv[++i];
+        else if (arg == "--shot" && i + 1 < argc) p->shotPath = argv[++i];
+        else if (arg == "--frames" && i + 1 < argc) p->shotFrames = std::atoi(argv[++i]);
+        else if (arg.size() > 3 && arg.compare(arg.size() - 3, 3, ".js") == 0) p->script = arg;
+        else p->design = arg;
+    }
+#ifdef __EMSCRIPTEN__
+    if (p->design.empty()) p->design = "/assets/wallet/canvas.json";
+    if (p->script.empty()) p->script = "/scripts/wallet.js";
+#else
+    if (p->design.empty()) {
+        for (const char* cand : {"wallet.fig", "../wallet.fig",
+                                 "D:/work_open/fig2psd/test/figma/wallet.fig"}) {
+            if (FILE* f = fopen(cand, "rb")) {
+                fclose(f);
+                p->design = cand;
                 break;
             }
         }
     }
+    if (p->script.empty()) p->script = std::string(EXAMPLES_DIR) + "/scripts/wallet.js";
+#endif
+    if (p->design.empty()) {
+        std::printf("usage: figmaplay [design.fig] [logic.js] [--selfdrive prefix] "
+                    "[--shot out.png] [--frames N]\n");
+        return 1;
+    }
+
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+    InitWindow(420, 900, "figmaplay — design.fig + logic.js");
+
+    p->ui = figmalib::FigmaUI::fromFile(p->design);
+#ifdef __EMSCRIPTEN__
+    // No system fonts in the browser: the design's font files ship in the
+    // preloaded FS.
+    p->ui->renderer().registerFontsFromDirectory("/fonts");
+#endif
+    if (!p->loadScript()) {
+        CloseWindow();
+        return 1;
+    }
+    p->scriptStamp = std::filesystem::last_write_time(p->script, p->fsEc);
+    p->view = std::make_unique<figmalib::RaylibFigmaView>(*p->ui);
+
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(emFrame, 0 /*use rAF*/, 1 /*never returns*/);
+#else
+    while (!WindowShouldClose() && !p->done) p->tick();
     CloseWindow();
+    delete p;
+#endif
     return 0;
 }

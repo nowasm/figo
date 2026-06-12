@@ -11,9 +11,12 @@ option(FIGMALIB_SCRIPTING "Build the QuickJS scripting host (figmalib_script)" O
 # ThorVG: prebuilt static library (meson: --default-library=static -Dstatic=true).
 # Prefer a CPU+GL build (engines=cpu,gl) when present — enables the zero-copy
 # GPU path; the CPU-only build still works (GPU calls fall back gracefully).
+# Web builds use the wasm cross build (see tools/build_thorvg_wasm.cmd).
 set(THORVG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/inc" CACHE PATH
     "Directory containing thorvg.h")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static_gl/src/libthorvg-1.a")
+if(EMSCRIPTEN)
+    set(_thorvg_default "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_wasm/src/libthorvg-1.a")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static_gl/src/libthorvg-1.a")
     set(_thorvg_default "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static_gl/src/libthorvg-1.a")
 else()
     set(_thorvg_default "${CMAKE_CURRENT_SOURCE_DIR}/../thorvg/build_static/src/libthorvg-1.a")
@@ -30,6 +33,13 @@ endif()
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+endif()
+
+# Emscripten disables C++ exceptions by default (throw would abort), but the
+# parsers rely on them — use native wasm exceptions (fast, Chrome/Edge 95+).
+if(EMSCRIPTEN)
+    add_compile_options(-fwasm-exceptions)
+    add_link_options(-fwasm-exceptions)
 endif()
 
 # ---- core library ----
@@ -59,7 +69,7 @@ target_compile_definitions(figmalib PRIVATE
 # loading falls back to the fig2json CLI.
 set(FIGMALIB_FIG2JSON_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.lib"
     CACHE FILEPATH "Path to the fig2json static library (empty/missing → CLI fallback)")
-if(EXISTS "${FIGMALIB_FIG2JSON_LIB}")
+if(EXISTS "${FIGMALIB_FIG2JSON_LIB}" AND NOT EMSCRIPTEN)
     target_compile_definitions(figmalib PRIVATE FIGMALIB_HAVE_FIG2JSON_LIB)
     target_link_libraries(figmalib PUBLIC "${FIGMALIB_FIG2JSON_LIB}")
     if(WIN32)
@@ -104,6 +114,9 @@ if(FIGMALIB_BACKEND_RAYLIB)
     include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+    if(EMSCRIPTEN)
+        set(PLATFORM "Web" CACHE STRING "" FORCE)  # raylib: GLFW shim + WebGL
+    endif()
     FetchContent_Declare(raylib
         URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
     )
@@ -115,7 +128,7 @@ if(FIGMALIB_BACKEND_RAYLIB)
 endif()
 
 # ---- examples ----
-if(FIGMALIB_BUILD_EXAMPLES AND FIGMALIB_BACKEND_RAYLIB)
+if(FIGMALIB_BUILD_EXAMPLES AND FIGMALIB_BACKEND_RAYLIB AND NOT EMSCRIPTEN)
     add_executable(demo_raylib examples/demo_raylib/main.cpp)
     target_link_libraries(demo_raylib PRIVATE figmalib_raylib)
     target_compile_definitions(demo_raylib PRIVATE
@@ -126,7 +139,7 @@ if(FIGMALIB_BUILD_EXAMPLES AND FIGMALIB_BACKEND_RAYLIB)
 endif()
 
 # ---- tests ----
-if(FIGMALIB_BUILD_EXAMPLES)
+if(FIGMALIB_BUILD_EXAMPLES AND NOT EMSCRIPTEN)
     add_executable(render_test tests/render_test/main.cpp)
     target_link_libraries(render_test PRIVATE figmalib)
     target_compile_definitions(render_test PRIVATE
@@ -142,10 +155,28 @@ if(FIGMALIB_SCRIPTING AND FIGMALIB_BACKEND_RAYLIB)
     target_link_libraries(figmaplay PRIVATE figmalib_raylib figmalib_script)
     target_compile_definitions(figmaplay PRIVATE
         EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples")
+    if(EMSCRIPTEN)
+        # The design ships pre-converted (canvas.json + images/) — .fig
+        # conversion is a native-only step. Point this at an export dir.
+        set(FIGMALIB_WEB_DESIGN_DIR
+            "${CMAKE_CURRENT_SOURCE_DIR}/../fig2psd/test/figma/wallet.fig.export"
+            CACHE PATH "Design dir (canvas.json + images) preloaded into the web FS")
+        set_target_properties(figmaplay PROPERTIES SUFFIX ".html")
+        target_link_options(figmaplay PRIVATE
+            "-sUSE_GLFW=3"
+            "-sALLOW_MEMORY_GROWTH=1"
+            "-sSTACK_SIZE=2097152"
+            "-sFORCE_FILESYSTEM=1"
+            # SHELL: keeps each flag+arg pair intact (CMake de-dups bare flags)
+            "SHELL:--preload-file ${FIGMALIB_WEB_DESIGN_DIR}@/assets/wallet"
+            "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/scripts/wallet.js@/scripts/wallet.js"
+            "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/assets/fonts@/fonts"
+        )
+    endif()
 endif()
 
 # ---- editor app ----
-if(FIGMALIB_BACKEND_RAYLIB)
+if(FIGMALIB_BACKEND_RAYLIB AND NOT EMSCRIPTEN)
     FetchContent_Declare(raygui
         URL https://github.com/raysan5/raygui/archive/refs/tags/4.0.tar.gz
     )

@@ -789,9 +789,16 @@ JSValue js_fetchNative(JSContext* ctx, JSValueConst, int argc, JSValueConst* arg
     if (JS_IsException(promise)) return promise;
     const uint64_t id = im->nextFetchId++;
     im->pendingFetch[id] = {funcs[0], funcs[1]};
+#ifdef _WIN32
     std::thread(fetchWorker, im->fetchQueue, id, std::move(url), std::move(method),
                 std::move(headers), std::move(body))
         .detach();
+#else
+    // No thread (wasm builds run without pthreads): the stub/sync worker
+    // queues its result immediately; the promise settles on the next update.
+    fetchWorker(im->fetchQueue, id, std::move(url), std::move(method),
+                std::move(headers), std::move(body));
+#endif
     return promise;
 }
 
