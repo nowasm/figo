@@ -296,6 +296,35 @@ GET https://api.figma.com/v1/files/<FILE_KEY>?geometry=paths
   constraints/stack 字段）；旧缓存会因 fig2json 更新自动重新转换。
   `layout_test.exe` 为布局数学的无窗口自测。
 
+## 一键多端打包（figmapack）
+
+`tools/figmapack.py` 把一个标准 app 工程（app.json）一条命令打成各端包体：
+
+```
+python tools/figmapack.py <app-dir> --target win|web|android|all [--out dist]
+python tools/figmapack.py examples/apps/sample -t all
+```
+
+产出落在 `<out>/<app-slug>/<target>/`：
+- **win**：`figmaplay.exe` + `app/` + `run.cmd`（双击即跑）
+- **web**：`index.html` + wasm/js/data（`python -m http.server` 起服务打开）
+- **android**：签名好的 `<app>.apk`（`adb install -r` 装机）
+
+打包元数据取自 app.json 的 `package` 段：`id` → android 包名、`version` →
+versionName/Code、`name` → 应用名。原理：figmapack 把 app 目录 staging 后，web/
+android 运行时**优先读 staging 的 `app.json`**（无则回退 wallet demo），三端共用同
+一份 design + 逻辑。
+
+约定与坑：
+- **.fig 设计**在打包时用 fig2json 转 canvas.json（web/android 不能现场转）；
+  canvas.json / REST `.json` 原样打包。
+- **web/android 没有系统字体**：app 的 design 用到的字体必须放进 app 的 `fonts/`
+  目录，否则文字渲染为空（桌面用系统字体不受影响）。
+- **iOS/macOS 不在此列**——需 Mac + Xcode + codesign；app.json 的 `package` 段为其
+  预留，待有 Mac/CI 时补 `--target ios`。
+
+下面是各端构建的底层细节（figmapack 即收敛自这些）：
+
 ## Web 构建（emscripten）
 
 wallet demo 可编译为 wasm 在浏览器运行（CPU 光栅化 → WebGL 上屏）：

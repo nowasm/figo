@@ -84,9 +84,13 @@ figmaplay <dir> --shot out.png [--frames N]     # 渲 N 帧截图退出
 对照 `design-systems/skills/design-review` 的思路，拿截图对着所选系统的 token
 自评：配色/间距/层级/对齐对不对，逐条修 → 回到第 4 步。
 
-## 6. 打包（Phase 2，尚未就绪）
-`app.json` 的 `package` 段（id/version/icon）是给后续 `figmapack` 统一打包
-（win/web/android/ios…）预留的，当前先占位。
+## 6. 打包多端（figmapack）
+```
+python tools/figmapack.py <app-dir> --target win|web|android|all
+```
+产物在 `dist/<app>/<target>/`（win=exe+run.cmd、web=index.html+wasm、android=apk）。
+元数据取自 app.json 的 `package` 段。**web/android 要把 design 用到的字体放进 app 的
+`fonts/` 目录**，否则文字空白。iOS/macOS 需 Mac，暂不支持。
 
 ---
 **闭环**：脚手架 → figmaedit 套 token 建设计 → 写 app.js → `--shot` 看图 → 迭代。

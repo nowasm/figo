@@ -188,11 +188,6 @@ if(FIGMALIB_SCRIPTING AND FIGMALIB_BACKEND_RAYLIB)
     target_compile_definitions(figmaplay PRIVATE
         EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples")
     if(EMSCRIPTEN)
-        # The design ships pre-converted (canvas.json + images/) — .fig
-        # conversion is a native-only step. Point this at an export dir.
-        set(FIGMALIB_WEB_DESIGN_DIR
-            "${CMAKE_CURRENT_SOURCE_DIR}/../fig2psd/test/figma/wallet.fig.export"
-            CACHE PATH "Design dir (canvas.json + images) preloaded into the web FS")
         set_target_properties(figmaplay PROPERTIES SUFFIX ".html")
         target_link_options(figmaplay PRIVATE
             "-sUSE_GLFW=3"
@@ -200,11 +195,26 @@ if(FIGMALIB_SCRIPTING AND FIGMALIB_BACKEND_RAYLIB)
             "-sSTACK_SIZE=2097152"
             "-sFORCE_FILESYSTEM=1"
             "-sFETCH"  # script-layer fetch() → browser XHR (async, no pthreads)
-            # SHELL: keeps each flag+arg pair intact (CMake de-dups bare flags)
-            "SHELL:--preload-file ${FIGMALIB_WEB_DESIGN_DIR}@/assets/wallet"
-            "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/scripts/wallet.js@/scripts/wallet.js"
-            "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/assets/fonts@/fonts"
         )
+        # A packaged app (figmapack): a standard app dir preloaded at /app, which
+        # the runtime prefers over the bundled wallet. The design must already be
+        # canvas.json / REST json (figmapack converts .fig first).
+        set(FIGMALIB_WEB_APP_DIR "" CACHE PATH "Packaged app dir preloaded at /app")
+        if(FIGMALIB_WEB_APP_DIR)
+            # SHELL: keeps each flag+arg pair intact (CMake de-dups bare flags)
+            target_link_options(figmaplay PRIVATE
+                "SHELL:--preload-file ${FIGMALIB_WEB_APP_DIR}@/app")
+        else()
+            # Default: the bundled wallet demo. The design ships pre-converted
+            # (canvas.json + images/) — .fig conversion is a native-only step.
+            set(FIGMALIB_WEB_DESIGN_DIR
+                "${CMAKE_CURRENT_SOURCE_DIR}/../fig2psd/test/figma/wallet.fig.export"
+                CACHE PATH "Design dir (canvas.json + images) preloaded into the web FS")
+            target_link_options(figmaplay PRIVATE
+                "SHELL:--preload-file ${FIGMALIB_WEB_DESIGN_DIR}@/assets/wallet"
+                "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/scripts/wallet.js@/scripts/wallet.js"
+                "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/assets/fonts@/fonts")
+        endif()
     endif()
 endif()
 

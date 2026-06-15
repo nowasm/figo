@@ -234,6 +234,15 @@ int main(int argc, char** argv) {
         else p->design = arg;
     }
 #if defined(__EMSCRIPTEN__)
+    // figmapack stages a packaged app at /app (app.json + design + script +
+    // fonts); fall back to the bundled wallet demo when none is present.
+    if (p->design.empty()) {
+        if (FILE* f = fopen("/app/app.json", "rb")) {
+            fclose(f);
+            p->design = "/app/app.json";
+            p->loadManifest();
+        }
+    }
     if (p->design.empty()) p->design = "/assets/wallet/canvas.json";
     if (p->script.empty()) p->script = "/scripts/wallet.js";
 #elif !defined(__ANDROID__)
@@ -273,6 +282,14 @@ int main(int argc, char** argv) {
 #ifdef __ANDROID__
     // The window is up → the activity (and its asset manager) is live.
     const std::string assetBase = extractAssets();
+    if (p->design.empty()) {
+        const std::string appManifest = assetBase + "/app/app.json";
+        if (FILE* f = fopen(appManifest.c_str(), "rb")) {
+            fclose(f);
+            p->design = appManifest;
+            p->loadManifest();  // resolves design/script/fonts under /app
+        }
+    }
     if (p->design.empty()) p->design = assetBase + "/assets/wallet/canvas.json";
     if (p->script.empty()) p->script = assetBase + "/scripts/wallet.js";
 #endif

@@ -1,6 +1,19 @@
-# Builds figmaplay.apk (no gradle): NDK cross-compile both ABIs, stage
+# Builds a figmaplay APK (no gradle): NDK cross-compile both ABIs, stage
 # assets, aapt package + zipalign + apksigner (debug key).
 # Prereqs: tools\build_thorvg_android.cmd, Android SDK at D:\devlib\android\sdk.
+#
+# No args -> the wallet demo (build_android\figmaplay.apk), as before.
+# Driven by figmapack: -AppDir points at a staged standard app dir (app.json +
+# design + app.js + fonts), preloaded into the APK at assets/app and read by the
+# runtime; -PackageId/-AppName/-VersionName/-VersionCode/-OutApk set metadata.
+param(
+    [string]$AppDir = "",
+    [string]$PackageId = "com.figmalib.play",
+    [string]$AppName = "figmaplay",
+    [string]$VersionName = "1.0",
+    [int]$VersionCode = 1,
+    [string]$OutApk = ""
+)
 $ErrorActionPreference = "Stop"
 
 $SDK = "D:\devlib\android\sdk"
@@ -13,6 +26,7 @@ if (-not $NINJA) { $NINJA = "C:\WINDOWS\ninja.exe" }
 $REPO = Split-Path $PSScriptRoot -Parent
 $DESIGN = "$REPO\..\fig2psd\test\figma\wallet.fig.export"
 $OUT = "$REPO\build_android"
+if (-not $OutApk) { $OutApk = "$OUT\figmaplay.apk" }
 
 # 1) Native libs per ABI.
 $abis = @{ "arm64-v8a" = "arm64"; "x86_64" = "x64" }
@@ -35,26 +49,60 @@ foreach ($abi in $abis.Keys) {
     New-Item -ItemType Directory -Force "$stage\lib\$abi" | Out-Null
     Copy-Item "$OUT\native-$($abis[$abi])\libfigmaplay.so" "$stage\lib\$abi\"
 }
-New-Item -ItemType Directory -Force "$stage\assets\scripts", "$stage\assets\fonts" | Out-Null
-Copy-Item -Recurse $DESIGN "$stage\assets\assets\wallet"
-Copy-Item "$REPO\examples\scripts\wallet.js" "$stage\assets\scripts\"
-Copy-Item "$REPO\examples\assets\fonts\*.ttf" "$stage\assets\fonts\"
 $assetRoot = "$stage\assets"
+New-Item -ItemType Directory -Force $assetRoot | Out-Null
+if ($AppDir) {
+    # A packaged app: the runtime reads assets/app/app.json.
+    Copy-Item -Recurse $AppDir "$assetRoot\app"
+} else {
+    # Legacy wallet demo layout.
+    New-Item -ItemType Directory -Force "$assetRoot\scripts", "$assetRoot\fonts" | Out-Null
+    Copy-Item -Recurse $DESIGN "$assetRoot\assets\wallet"
+    Copy-Item "$REPO\examples\scripts\wallet.js" "$assetRoot\scripts\"
+    Copy-Item "$REPO\examples\assets\fonts\*.ttf" "$assetRoot\fonts\"
+}
 $manifest = Get-ChildItem $assetRoot -Recurse -File | ForEach-Object {
     $_.FullName.Substring($assetRoot.Length + 1).Replace("\", "/")
 }
 Set-Content "$assetRoot\manifest.txt" ($manifest -join "`n") -Encoding ascii
 
+# 2b) AndroidManifest with the app's package id / version / label.
+$manifestXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="$PackageId" android:versionCode="$VersionCode" android:versionName="$VersionName">
+  <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="34"/>
+  <application android:label="$AppName" android:hasCode="false" android:extractNativeLibs="true">
+    <activity android:name="android.app.NativeActivity" android:exported="true"
+              android:configChanges="orientation|keyboardHidden|screenSize">
+      <meta-data android:name="android.app.lib_name" android:value="figmaplay"/>
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>
+"@
+# aapt requires the -M file to be literally named AndroidManifest.xml; write the
+# generated one into a dedicated dir (not the source apps/figmaplay/android one).
+# UTF-8 *without* BOM — aapt fails ("No AndroidManifest.xml file found") on a BOM.
+$genDir = "$OUT\gen"
+New-Item -ItemType Directory -Force $genDir | Out-Null
+$manifestPath = "$genDir\AndroidManifest.xml"
+[System.IO.File]::WriteAllText($manifestPath, $manifestXml, (New-Object System.Text.UTF8Encoding $false))
+
 # 3) Package: aapt (manifest + assets), aapt add (libs), align, sign.
 $unsigned = "$OUT\figmaplay-unsigned.apk"
-Remove-Item $unsigned, "$OUT\figmaplay-aligned.apk", "$OUT\figmaplay.apk" -ErrorAction SilentlyContinue
-& "$BT\aapt.exe" package -f -F $unsigned -M "$REPO\apps\figmaplay\android\AndroidManifest.xml" -I $JAR -A $assetRoot
+$aligned = "$OUT\figmaplay-aligned.apk"
+Remove-Item $unsigned, $aligned, $OutApk -ErrorAction SilentlyContinue
+& "$BT\aapt.exe" package -f -F $unsigned -M $manifestPath -I $JAR -A $assetRoot
 if ($LASTEXITCODE) { throw "aapt package failed" }
 Push-Location $stage
 & "$BT\aapt.exe" add $unsigned "lib/arm64-v8a/libfigmaplay.so" "lib/x86_64/libfigmaplay.so" | Out-Null
 if ($LASTEXITCODE) { Pop-Location; throw "aapt add libs failed" }
 Pop-Location
-& "$BT\zipalign.exe" -f -p 4 $unsigned "$OUT\figmaplay-aligned.apk"
+& "$BT\zipalign.exe" -f -p 4 $unsigned $aligned
 if ($LASTEXITCODE) { throw "zipalign failed" }
 
 $ks = "$env:USERPROFILE\.android\debug.keystore"
@@ -64,8 +112,9 @@ if (-not (Test-Path $ks)) {
         -storepass android -keypass android -keyalg RSA -validity 10000 `
         -dname "CN=Android Debug,O=Android,C=US"
 }
+New-Item -ItemType Directory -Force (Split-Path $OutApk) | Out-Null
 & "$BT\apksigner.bat" sign --ks $ks --ks-pass pass:android --key-pass pass:android `
-    --out "$OUT\figmaplay.apk" "$OUT\figmaplay-aligned.apk"
+    --out $OutApk $aligned
 if ($LASTEXITCODE) { throw "apksigner failed" }
-Remove-Item $unsigned, "$OUT\figmaplay-aligned.apk", "$OUT\figmaplay.apk.idsig" -ErrorAction SilentlyContinue
-Write-Host "OK -> $OUT\figmaplay.apk"
+Remove-Item $unsigned, $aligned, "$OutApk.idsig" -ErrorAction SilentlyContinue
+Write-Host "OK -> $OutApk"

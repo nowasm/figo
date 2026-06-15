@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""figmapack — one command, multiple platform packages for a figmaplay app.
+
+An app is a standard app project dir (app.json + design + app.js [+ fonts/];
+see the README "app 工程" section). This stages it and builds packages for the
+targets buildable on Windows: win / web / android. (iOS/macOS need a Mac +
+Xcode + codesign — out of scope here; the app.json `package` block is reserved
+for them.)
+
+    python tools/figmapack.py <app-dir> --target web
+    python tools/figmapack.py examples/apps/sample --target all
+    python tools/figmapack.py myapp -t android --out dist
+
+Output lands in <out>/<app-slug>/<target>/. Metadata (package id / version /
+name) comes from app.json's `package` block.
+
+Notes
+- web/android have no system fonts: the app must bundle the fonts its design
+  uses in its fonts/ dir, or text renders blank. (Desktop uses system fonts.)
+- a .fig design is converted with fig2json at pack time (web/android can't
+  convert in-place); canvas.json / REST .json designs are staged as-is.
+"""
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def log(msg):
+    print(f"[figmapack] {msg}")
+
+
+def die(msg):
+    print(f"[figmapack] error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def slug(name):
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "app"
+
+
+def load_app(app_dir):
+    mp = os.path.join(app_dir, "app.json")
+    if not os.path.isfile(mp):
+        die(f"no app.json in {app_dir}")
+    m = json.load(open(mp, encoding="utf-8"))
+    m.setdefault("design", "design.json")
+    m.setdefault("script", "app.js")
+    m.setdefault("name", os.path.basename(os.path.abspath(app_dir)))
+    pkg = m.setdefault("package", {})
+    pkg.setdefault("id", f"com.example.{slug(m['name'])}")
+    pkg.setdefault("version", "1.0.0")
+    return m
+
+
+def version_code(ver):
+    # "1.2.3" -> 10203  (android needs a monotonic integer)
+    parts = (ver.split(".") + ["0", "0", "0"])[:3]
+    try:
+        a, b, c = (int(p) for p in parts)
+        return a * 10000 + b * 100 + c
+    except ValueError:
+        return 1
+
+
+def run_fig2json(fig_path, out_dir):
+    exe = os.environ.get("FIGMALIB_FIG2JSON",
+                         os.path.join(ROOT, "..", "fig2json", "target", "release", "fig2json.exe"))
+    if not os.path.isfile(exe):
+        die(f"design is a .fig but fig2json not found at {exe} (set FIGMALIB_FIG2JSON)")
+    log(f"fig2json {os.path.basename(fig_path)} -> canvas.json")
+    subprocess.check_call([exe, fig_path, out_dir])
+
+
+def stage_app(app_dir, m, stage_root):
+    """Copy the app into stage_root with a normalized, web/android-ready layout:
+    app.json + design (canvas.json/REST json) + app.js + fonts/. Returns the
+    staged app.json (possibly with design rewritten to canvas.json)."""
+    stage = os.path.join(stage_root, slug(m["name"]))
+    if os.path.isdir(stage):
+        shutil.rmtree(stage)
+    os.makedirs(stage)
+    sm = dict(m)
+
+    design = os.path.join(app_dir, m["design"])
+    if not os.path.exists(design):
+        die(f"design not found: {design}")
+    if design.lower().endswith(".fig"):
+        run_fig2json(os.path.abspath(design), stage)  # writes canvas.json + images/
+        sm["design"] = "canvas.json"
+    else:
+        shutil.copy(design, os.path.join(stage, os.path.basename(design)))
+        sm["design"] = os.path.basename(design)
+
+    script = os.path.join(app_dir, m["script"])
+    if not os.path.isfile(script):
+        die(f"script not found: {script}")
+    shutil.copy(script, os.path.join(stage, "app.js"))
+    sm["script"] = "app.js"
+
+    fonts = m.get("fonts")
+    if fonts and os.path.isdir(os.path.join(app_dir, fonts)):
+        shutil.copytree(os.path.join(app_dir, fonts), os.path.join(stage, "fonts"))
+        sm["fonts"] = "fonts"
+    else:
+        sm.pop("fonts", None)
+
+    json.dump(sm, open(os.path.join(stage, "app.json"), "w", encoding="utf-8"), indent=2)
+    return stage, sm
+
+
+def cmd_wrapper(lines):
+    """Run a cmd.exe script (for tools needing a sourced env, e.g. emsdk).
+    Mirrors the vcvars wrapper pattern in CLAUDE.md."""
+    bat = os.path.join(ROOT, "build", f"_figmapack_{os.getpid()}.cmd")
+    os.makedirs(os.path.dirname(bat), exist_ok=True)
+    with open(bat, "w", encoding="ascii") as f:
+        f.write("\r\n".join(lines) + "\r\n")
+    try:
+        return subprocess.call(["cmd", "/c", bat])
+    finally:
+        os.remove(bat)
+
+
+# ----------------------------------------------------------------------- win --
+def pack_win(stage, m, out):
+    exe = os.path.join(ROOT, "build", "figmaplay.exe")
+    if not os.path.isfile(exe):
+        die("build/figmaplay.exe missing — build the desktop target first "
+            "(cmake --build build --target figmaplay)")
+    dst = os.path.join(out, "win")
+    os.makedirs(dst, exist_ok=True)
+    shutil.copy(exe, os.path.join(dst, "figmaplay.exe"))
+    app_dst = os.path.join(dst, "app")
+    if os.path.isdir(app_dst):
+        shutil.rmtree(app_dst)
+    shutil.copytree(stage, app_dst)
+    with open(os.path.join(dst, "run.cmd"), "w", encoding="ascii") as f:
+        f.write('@echo off\r\n"%~dp0figmaplay.exe" "%~dp0app"\r\n')
+    log(f"win -> {os.path.relpath(dst, os.getcwd())}  (run.cmd)")
+
+
+# ----------------------------------------------------------------------- web --
+def pack_web(stage, m, out):
+    build_web = os.path.join(ROOT, "build_web")
+    extra = ""
+    for dep in ("raylib", "quickjs"):
+        src = os.path.join(ROOT, "build", "_deps", f"{dep}-src", "CMakeLists.txt")
+        if os.path.isfile(src):
+            extra += f" -DFETCHCONTENT_SOURCE_DIR_{dep.upper()}={os.path.dirname(src).replace(chr(92),'/')}"
+    app = stage.replace("\\", "/")
+    emsdk = os.environ.get("EMSDK_HOME", "D:\\devlib\\emsdk")
+    rc = cmd_wrapper([
+        f'call "{emsdk}\\emsdk_env.bat" >nul 2>&1',
+        f'cd /d "{ROOT}"',
+        f'call emcmake cmake -B build_web -G Ninja -DCMAKE_BUILD_TYPE=Release '
+        f'-DFIGMALIB_WEB_APP_DIR={app}{extra}',
+        'if errorlevel 1 exit /b 1',
+        'ninja -C build_web figmaplay',
+    ])
+    if rc:
+        die("web build failed")
+    dst = os.path.join(out, "web")
+    os.makedirs(dst, exist_ok=True)
+    for ext, name in (("html", "index.html"), ("js", "figmaplay.js"),
+                      ("wasm", "figmaplay.wasm"), ("data", "figmaplay.data")):
+        src = os.path.join(build_web, f"figmaplay.{ext}")
+        if os.path.isfile(src):
+            shutil.copy(src, os.path.join(dst, name))
+    log(f"web -> {os.path.relpath(dst, os.getcwd())}  (serve index.html)")
+
+
+# ------------------------------------------------------------------- android --
+def pack_android(stage, m, out):
+    ps1 = os.path.join(ROOT, "tools", "build_android.ps1")
+    pkg = m["package"]
+    dst = os.path.join(out, "android")
+    os.makedirs(dst, exist_ok=True)
+    rc = subprocess.call([
+        "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1,
+        "-AppDir", stage,
+        "-PackageId", pkg["id"],
+        "-AppName", m["name"],
+        "-VersionName", pkg["version"],
+        "-VersionCode", str(version_code(pkg["version"])),
+        "-OutApk", os.path.join(dst, f"{slug(m['name'])}.apk"),
+    ])
+    if rc:
+        die("android build failed")
+    log(f"android -> {os.path.relpath(dst, os.getcwd())}")
+
+
+TARGETS = {"win": pack_win, "web": pack_web, "android": pack_android}
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Package a figmaplay app for win/web/android.")
+    ap.add_argument("app_dir", help="app project directory (with app.json)")
+    ap.add_argument("--target", "-t", default="all",
+                    help="win | web | android | all (comma-separated ok)")
+    ap.add_argument("--out", "-o", default="dist", help="output dir (default: dist)")
+    args = ap.parse_args()
+
+    if not os.path.isdir(args.app_dir):
+        die(f"not a directory: {args.app_dir}")
+    targets = list(TARGETS) if args.target == "all" else \
+        [t.strip() for t in args.target.split(",")]
+    for t in targets:
+        if t not in TARGETS:
+            die(f"unknown target '{t}'. choices: {', '.join(TARGETS)}, all")
+
+    m = load_app(args.app_dir)
+    out = os.path.join(os.path.abspath(args.out), slug(m["name"]))
+    os.makedirs(out, exist_ok=True)
+    log(f"app '{m['name']}'  (id {m['package']['id']} v{m['package']['version']})  "
+        f"targets: {', '.join(targets)}")
+    stage, sm = stage_app(args.app_dir, m, os.path.join(out, ".stage"))
+    log(f"staged -> {os.path.relpath(stage, os.getcwd())}  (design: {sm['design']}"
+        f"{', fonts' if sm.get('fonts') else ', NO fonts — text may be blank on web/android'})")
+
+    for t in targets:
+        TARGETS[t](stage, m, out)
+    log(f"done -> {os.path.relpath(out, os.getcwd())}")
+
+
+if __name__ == "__main__":
+    main()
