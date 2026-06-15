@@ -4,6 +4,7 @@
   "script": "app.js",
   "viewport": [390, 844],
   "entryFrame": "Form",
+  "fonts": "fonts",
   "designSystem": "stripe",
   "package": {
     "id": "com.example.app",

@@ -17,10 +17,14 @@ bigger aesthetic lever and those come straight from the tokens.
 import json
 import os
 import re
+import shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 W, H = 390, 844
-FONT = "Segoe UI"
+# Bundled open font (Poppins, weights 400/600/700) so text renders on web/android
+# too — those platforms have no system fonts. Copied into each template's fonts/.
+FONT = "Poppins"
+FONT_FILES = ["Poppins-Regular.ttf", "Poppins-SemiBold.ttf", "Poppins-Bold.ttf"]
 
 
 def tokens(system):
@@ -110,10 +114,17 @@ def document(*frames):
 
 
 def write(name, doc):
-    out = os.path.join(ROOT, "templates", name, "design.json")
-    os.makedirs(os.path.dirname(out), exist_ok=True)
+    tdir = os.path.join(ROOT, "templates", name)
+    out = os.path.join(tdir, "design.json")
+    os.makedirs(tdir, exist_ok=True)
     json.dump(doc, open(out, "w", encoding="utf-8"), indent=1)
-    print(f"  {name}/design.json  ({os.path.getsize(out)} bytes)")
+    # Bundle the fonts so the template works on web/android out of the box.
+    fdir = os.path.join(tdir, "fonts")
+    os.makedirs(fdir, exist_ok=True)
+    src = os.path.join(ROOT, "examples", "assets", "fonts")
+    for f in FONT_FILES:
+        shutil.copy(os.path.join(src, f), os.path.join(fdir, f))
+    print(f"  {name}/design.json  ({os.path.getsize(out)} bytes) + fonts/")
 
 
 # ---------------------------------------------------------------- tab-shell ---

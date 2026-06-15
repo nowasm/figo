@@ -65,7 +65,7 @@
          }
         ],
         "style": {
-         "fontFamily": "Segoe UI",
+         "fontFamily": "Poppins",
          "fontWeight": 700,
          "fontSize": 30,
          "textAlignHorizontal": "LEFT",
@@ -106,7 +106,7 @@
          }
         ],
         "style": {
-         "fontFamily": "Segoe UI",
+         "fontFamily": "Poppins",
          "fontWeight": 400,
          "fontSize": 15,
          "textAlignHorizontal": "LEFT",
@@ -147,7 +147,7 @@
          }
         ],
         "style": {
-         "fontFamily": "Segoe UI",
+         "fontFamily": "Poppins",
          "fontWeight": 600,
          "fontSize": 13,
          "textAlignHorizontal": "LEFT",
@@ -210,7 +210,7 @@
            }
           ],
           "style": {
-           "fontFamily": "Segoe UI",
+           "fontFamily": "Poppins",
            "fontWeight": 400,
            "fontSize": 16,
            "textAlignHorizontal": "LEFT",
@@ -278,7 +278,7 @@
          }
         ],
         "style": {
-         "fontFamily": "Segoe UI",
+         "fontFamily": "Poppins",
          "fontWeight": 600,
          "fontSize": 13,
          "textAlignHorizontal": "LEFT",
@@ -341,7 +341,7 @@
            }
           ],
           "style": {
-           "fontFamily": "Segoe UI",
+           "fontFamily": "Poppins",
            "fontWeight": 400,
            "fontSize": 16,
            "textAlignHorizontal": "LEFT",
@@ -431,7 +431,7 @@
            }
           ],
           "style": {
-           "fontFamily": "Segoe UI",
+           "fontFamily": "Poppins",
            "fontWeight": 600,
            "fontSize": 16,
            "textAlignHorizontal": "CENTER",
@@ -486,7 +486,7 @@
          }
         ],
         "style": {
-         "fontFamily": "Segoe UI",
+         "fontFamily": "Poppins",
          "fontWeight": 600,
          "fontSize": 15,
          "textAlignHorizontal": "LEFT",

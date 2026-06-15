@@ -4,6 +4,7 @@
   "script": "app.js",
   "viewport": [390, 844],
   "entryFrame": "Home",
+  "fonts": "fonts",
   "designSystem": "linear-app",
   "package": {
     "id": "com.example.app",

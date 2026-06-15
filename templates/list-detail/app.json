@@ -4,6 +4,7 @@
   "script": "app.js",
   "viewport": [390, 844],
   "entryFrame": "List",
+  "fonts": "fonts",
   "designSystem": "coinbase",
   "package": {
     "id": "com.example.app",
