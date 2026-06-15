@@ -200,6 +200,28 @@ manifest 会以 `globalThis.APP` 暴露给脚本（`APP.name` / `APP.entryFrame`
 [`design-systems/`](design-systems/) 的设计审美知识接进创作闭环——AI 建设计前先读
 对应 token，见 `design-systems/TOKEN_MAPPING.md`。
 
+### 从模板起步（figmanew）
+
+`templates/` 下有几个标准 app 工程模板，`tools/figmanew.py` 把模板复制成新工程
+并改好 `app.json`——AI / 人从一个**能跑的 app** 改起，而不是从零生成：
+
+```
+python tools/figmanew.py --list                       # 列出模板
+python tools/figmanew.py myapp --template list-detail  # 生成 myapp/
+python tools/figmanew.py myapp -t tab-shell -n "My App" -d revolut
+figmaplay myapp                                        # 跑起来
+```
+
+| 模板 | 结构 | 配色取自 |
+|---|---|---|
+| `tab-shell` | 底部 tab 框架（Home/Search/Profile，固定导航栏） | linear-app |
+| `list-detail` | 可滚动列表 → 详情页（`bindList` + 导航） | coinbase |
+| `form` | 可编辑输入 + 提交（`setEditable`/`focusText`） | stripe |
+
+模板的 `design.json` 由 `tools/gen_templates.py` 用对应设计系统的 token 生成（配色/
+圆角来自 `design-tokens.json`）。模板文本用 Segoe UI；要还原设计系统自带字体，把
+对应 .ttf 放进 app 的 `fonts/` 目录。
+
 ### 获取 Figma 数据
 
 **方式一：本地 .fig 文件（推荐，离线）**
