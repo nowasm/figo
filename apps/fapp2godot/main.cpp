@@ -609,8 +609,12 @@ struct Converter {
         // (most headings/labels) stays autowrap-off and renders normally.
         const std::string& ar = n.textStyle.autoResize;
         const bool truncate = n.textStyle.truncateEnding || ar == "TRUNCATE";
-        const bool multiline =
-            !truncate && (ar == "HEIGHT" || n.height > n.textStyle.fontSize * 1.6f);
+        // Wrap only when the box is genuinely tall enough for 2+ lines, measured
+        // against the LINE height (not font size — a generous line-height on a
+        // single line must not be mistaken for multi-line and wrap+clip).
+        const float lineH = n.textStyle.lineHeightPx > 0 ? n.textStyle.lineHeightPx
+                                                         : n.textStyle.fontSize * 1.3f;
+        const bool multiline = !truncate && lineH > 0 && n.height > lineH * 1.8f;
         if (multiline) body += "autowrap_mode = 3\n";        // WORD_SMART
         if (truncate) body += "text_overrun_behavior = 3\n";  // single-line ellipsis
     }

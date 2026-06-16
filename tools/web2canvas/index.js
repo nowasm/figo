@@ -111,6 +111,37 @@ function collectorFn(rootSelector) {
   // A uniform solid border maps to a Figma stroke; anything else (dashed,
   // dotted, or only some sides — e.g. a border-bottom separator) can't, so
   // rasterize the element to keep it faithful.
+  // Parse a box-shadow / filter:drop-shadow into a structured effect with the
+  // color normalized (handles oklch glows that a plain rgb parser would drop).
+  function splitTopComma(s) {
+    const out = []; let d = 0, last = 0;
+    for (let i = 0; i < s.length; i++) { const c = s[i]; if (c === '(') d++; else if (c === ')') d--; else if (c === ',' && d === 0) { out.push(s.slice(last, i)); last = i + 1; } }
+    out.push(s.slice(last)); return out;
+  }
+  function colorOf(str) { const c = str.replace(/\binset\b/g, '').trim(); return c ? norm(c) : null; }
+  function shadowFromBox(s) {
+    if (!s || s === 'none') return null;
+    s = splitTopComma(s)[0];
+    const nums = (s.match(/-?[\d.]+px/g) || []).map(parseFloat);
+    if (nums.length < 2) return null;
+    const color = colorOf(s.replace(/-?[\d.]+px/g, ''));
+    if (!color) return null;
+    const [ox = 0, oy = 0, blur = 0, spread = 0] = nums;
+    return { ox, oy, blur, spread, color };
+  }
+  function shadowFromFilter(f) {
+    if (!f || f === 'none') return null;
+    const i = f.indexOf('drop-shadow(');
+    if (i < 0) return null;
+    let depth = 0, start = i + 12, j = start;
+    for (; j < f.length; j++) { if (f[j] === '(') depth++; else if (f[j] === ')') { if (depth === 0) break; depth--; } }
+    const inner = f.slice(start, j);
+    const nums = (inner.match(/-?[\d.]+px/g) || []).map(parseFloat);
+    if (nums.length < 2) return null;
+    const color = colorOf(inner.replace(/-?[\d.]+px/g, '')) || 'rgba(0,0,0,0.5)';
+    const [ox = 0, oy = 0, blur = 0] = nums;
+    return { ox, oy, blur, spread: 0, color };
+  }
   function fancyBorder(cs) {
     const sides = ['Top', 'Right', 'Bottom', 'Left'];
     const w0 = parseFloat(cs.borderTopWidth) || 0, c0 = cs.borderTopColor;
@@ -179,7 +210,7 @@ function collectorFn(rootSelector) {
       borderW: parseFloat(cs.borderTopWidth) || 0,
       borderColor: norm(cs.borderTopColor),
       borderStyle: cs.borderTopStyle,
-      shadow: cs.boxShadow,
+      effect: shadowFromBox(cs.boxShadow) || shadowFromFilter(cs.filter),
       opacity: parseFloat(cs.opacity),
       transform: cs.transform,
       overflow: cs.overflow,
@@ -252,18 +283,6 @@ function solidPaint(colorStr) {
   if (c.alpha < 1) p.opacity = c.alpha;
   return p;
 }
-function parseShadow(s) {
-  if (!s || s === 'none') return null;
-  const colorMatch = /rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}/.exec(s);
-  const color = colorMatch ? parseColor(colorMatch[0]) : { hex: '#000000', alpha: 0.25 };
-  const nums = (s.replace(/rgba?\([^)]+\)/, '').match(/-?\d*\.?\d+px/g) || []).map(parseFloat);
-  if (nums.length < 2) return null;
-  const [ox = 0, oy = 0, blur = 0, spread = 0] = nums;
-  const hex = (color && color.hex) || '#000000';
-  return { type: 'DROP_SHADOW',
-    color: hex + Math.round((color ? color.alpha : 0.25) * 255).toString(16).padStart(2, '0'),
-    offset: { x: ox, y: oy }, radius: blur, spread };
-}
 function rotationDeg(transform) {
   if (!transform || transform === 'none') return 0;
   const m = /matrix\(([^)]+)\)/.exec(transform);
@@ -291,10 +310,12 @@ function makeTextNode(n, base) {
   const al = (n.textAlign || 'left').toLowerCase();
   node.textAlignHorizontal = al === 'start' ? 'LEFT' : al === 'end' ? 'RIGHT'
     : al === 'justify' ? 'JUSTIFIED' : al.toUpperCase();
-  // Only mark wrapping (HEIGHT) when the measured text actually spans multiple
-  // lines; a single-line label stays NONE so a font-width mismatch downstream
-  // can't wrap-and-clip it (e.g. "1.2" -> "1." / "2").
-  node.textAutoResize = (tr.h > n.fontSize * 1.5) ? 'HEIGHT' : 'NONE';
+  // Only mark wrapping (HEIGHT) when the measured text actually spans 2+ lines
+  // (vs its line-height, NOT font-size — a generous line-height on one line
+  // must not look multi-line). Single-line stays NONE so a downstream
+  // font-width mismatch can't wrap-and-clip it.
+  const lh = /px/.test(n.lineHeight || '') ? parseFloat(n.lineHeight) : n.fontSize * 1.3;
+  node.textAutoResize = (tr.h > lh * 1.6) ? 'HEIGHT' : 'NONE';
   const fp = solidPaint(n.color);
   if (fp) node.fillPaints = [fp];
   return node;
@@ -307,8 +328,7 @@ function mapNode(n, parent) {
   const solid = solidPaint(n.bg);
   const hasBorder = n.borderW > 0 && n.borderStyle !== 'none';
   const hasRadius = (n.radius || []).some(v => v > 0);
-  const hasShadow = n.shadow && n.shadow !== 'none';
-  const boxVisual = !!solid || !!n.raster || hasBorder || hasRadius || hasShadow;
+  const boxVisual = !!solid || !!n.raster || hasBorder || hasRadius || !!n.effect;
 
   // Pure text (no box, no children) -> a single TEXT node.
   if (parent && hasText && !boxVisual && kids.length === 0) {
@@ -337,8 +357,14 @@ function mapNode(n, parent) {
     if (r.every(v => v === r[0])) node.cornerRadius = r[0];
     else { node.topLeftRadius = r[0]; node.topRightRadius = r[1]; node.bottomRightRadius = r[2]; node.bottomLeftRadius = r[3]; }
   }
-  const eff = parseShadow(n.shadow);
-  if (eff) node.effects = [eff];
+  if (n.effect) {
+    const c = parseColor(n.effect.color) || { hex: '#000000', alpha: 0.5 };
+    node.effects = [{
+      type: 'DROP_SHADOW',
+      color: c.hex + Math.round(c.alpha * 255).toString(16).padStart(2, '0'),
+      offset: { x: n.effect.ox, y: n.effect.oy }, radius: n.effect.blur, spread: n.effect.spread,
+    }];
+  }
   node.frameMaskDisabled = !(n.overflow && n.overflow !== 'visible');
   if (n.opacity < 0.999) node.opacity = n.opacity;
 
