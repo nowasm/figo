@@ -452,8 +452,15 @@ struct Converter {
 
         auto it = all.find(h);
         if (it == all.end()) {
-            char name[32];
-            std::snprintf(name, sizeof(name), "%016llx.png", (unsigned long long)h);
+            // Readable, content-addressed filename: <node-name>_<hash8>.png. The
+            // hash keeps dedup correct; the name makes the resource identifiable.
+            std::string stem;
+            for (char c : sanitizeName(n.name, "sprite"))
+                stem.push_back((std::isalnum((unsigned char)c) || c == '-' || c == '_') ? c : '_');
+            if (stem.size() > 40) stem.resize(40);
+            char suffix[16];
+            std::snprintf(suffix, sizeof(suffix), "_%08x.png", (unsigned)(h & 0xffffffffu));
+            std::string name = stem + suffix;
             if (!writePng(spritesDir / name, crop.data(), cw, ch)) return out;
             GSprite g;
             g.file = std::string("sprites/") + name;

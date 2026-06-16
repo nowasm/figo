@@ -105,6 +105,25 @@ function collectorFn(rootSelector) {
     } catch (e) { return c; }
   }
 
+  // Semantic name: nearest React component (via fiber), else first CSS class,
+  // else the tag. Gives meaningful node/sprite names (PlayerCard, BigButton)
+  // instead of div_0 — the "naming spine" for the prefab workflow.
+  function reactName(el) {
+    const k = Object.keys(el).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+    if (!k) return null;
+    let f = el[k];
+    while (f) {
+      const t = f.type;
+      if (typeof t === 'function') { const n = t.displayName || t.name; if (n && n.length > 1 && n !== '_default') return n; }
+      f = f.return;
+    }
+    return null;
+  }
+  function semanticName(el) {
+    const cn = (typeof el.className === 'string' && el.className.trim()) ? el.className.trim().split(/\s+/)[0] : null;
+    return reactName(el) || cn || null;
+  }
+
   function visible(el, cs) {
     if (cs.display === 'none' || cs.visibility === 'hidden') return false;
     if (parseFloat(cs.opacity) === 0) return false;
@@ -205,6 +224,7 @@ function collectorFn(rootSelector) {
 
     const out = {
       tag,
+      cname: semanticName(el),
       rect: { x: r.left - ox, y: r.top - oy, w: r.width, h: r.height },
       text: ti ? ti.text : null,
       textRect: ti ? ti.rect : null,
@@ -352,7 +372,7 @@ function mapNode(n, parent) {
 
   // Otherwise a FRAME box; text (if any) and children go inside it.
   const node = {
-    name: n.tag + '_' + (nameCounter++),
+    name: n.cname || (n.tag + '_' + (nameCounter++)),
     type: 'FRAME',
     transform: { x: parent ? +(n.rect.x - base.x).toFixed(2) : 0, y: parent ? +(n.rect.y - base.y).toFixed(2) : 0 },
     size: { x: +n.rect.w.toFixed(2), y: +n.rect.h.toFixed(2) },
