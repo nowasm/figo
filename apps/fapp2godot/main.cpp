@@ -564,13 +564,18 @@ struct Converter {
         }
         if (ha) body += "horizontal_alignment = " + std::to_string(ha) + "\n";
         if (va) body += "vertical_alignment = " + std::to_string(va) + "\n";
-        // Figma textAutoResize: NONE/HEIGHT keep a fixed width and wrap; only
-        // WIDTH_AND_HEIGHT hugs to a single line. TRUNCATE → single-line ellipsis.
+        // Figma textAutoResize: NONE/HEIGHT keep a fixed width and may wrap.
+        // Only turn on wrapping when the box is clearly tall enough for more
+        // than one line — Godot DROPS a wrapped line entirely when the single
+        // line is taller than the control's box (a font-18 heading in a 20px
+        // box), whereas figmalib just lets it overflow. So a single-line box
+        // (most headings/labels) stays autowrap-off and renders normally.
         const std::string& ar = n.textStyle.autoResize;
-        if (ar == "NONE" || ar == "HEIGHT" || ar.empty())
-            body += "autowrap_mode = 3\n";  // WORD_SMART
-        if (n.textStyle.truncateEnding || ar == "TRUNCATE")
-            body += "text_overrun_behavior = 3\n";  // TRIM_ELLIPSIS
+        const bool truncate = n.textStyle.truncateEnding || ar == "TRUNCATE";
+        const bool multiline =
+            !truncate && (ar == "HEIGHT" || n.height > n.textStyle.fontSize * 1.6f);
+        if (multiline) body += "autowrap_mode = 3\n";        // WORD_SMART
+        if (truncate) body += "text_overrun_behavior = 3\n";  // single-line ellipsis
     }
 
     // Emit node `n` (already named `name`, unique among siblings) under parentAttr.
