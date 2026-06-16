@@ -108,6 +108,20 @@ function collectorFn(rootSelector) {
     return r.width >= 1 && r.height >= 1;
   }
   function hasRealBg(cs) { return cs.backgroundImage && cs.backgroundImage !== 'none'; }
+  // A uniform solid border maps to a Figma stroke; anything else (dashed,
+  // dotted, or only some sides — e.g. a border-bottom separator) can't, so
+  // rasterize the element to keep it faithful.
+  function fancyBorder(cs) {
+    const sides = ['Top', 'Right', 'Bottom', 'Left'];
+    const w0 = parseFloat(cs.borderTopWidth) || 0, c0 = cs.borderTopColor;
+    let present = 0, uniformSolid = true;
+    for (const s of sides) {
+      const w = parseFloat(cs['border' + s + 'Width']) || 0, st = cs['border' + s + 'Style'];
+      if (w > 0 && st !== 'none') present++;
+      if (!(w === w0 && st === 'solid' && cs['border' + s + 'Color'] === c0)) uniformSolid = false;
+    }
+    return present > 0 && !uniformSolid;
+  }
   // getBoundingClientRect gives a rotated/skewed/scaled element's axis-aligned
   // bbox, losing its real shape (a thin rotated line becomes a square). Such
   // elements must be rasterized so the browser draws them correctly.
@@ -148,7 +162,7 @@ function collectorFn(rootSelector) {
 
     const wholeRaster = (tag === 'img' || tag === 'svg' || tag === 'canvas' || tag === 'video') || isTransformed(cs);
     const clipped = cs.clipPath && cs.clipPath !== 'none';
-    const bgRaster = hasRealBg(cs) || clipped;
+    const bgRaster = hasRealBg(cs) || clipped || fancyBorder(cs);
     let raster = null, rasterWhole = false, rasterHideContent = false;
     if (wholeRaster) { raster = ++rid; rasterWhole = true; }
     else if (bgRaster) { raster = ++rid; rasterHideContent = true; }
@@ -277,7 +291,10 @@ function makeTextNode(n, base) {
   const al = (n.textAlign || 'left').toLowerCase();
   node.textAlignHorizontal = al === 'start' ? 'LEFT' : al === 'end' ? 'RIGHT'
     : al === 'justify' ? 'JUSTIFIED' : al.toUpperCase();
-  node.textAutoResize = 'HEIGHT';
+  // Only mark wrapping (HEIGHT) when the measured text actually spans multiple
+  // lines; a single-line label stays NONE so a font-width mismatch downstream
+  // can't wrap-and-clip it (e.g. "1.2" -> "1." / "2").
+  node.textAutoResize = (tr.h > n.fontSize * 1.5) ? 'HEIGHT' : 'NONE';
   const fp = solidPaint(n.color);
   if (fp) node.fillPaints = [fp];
   return node;
