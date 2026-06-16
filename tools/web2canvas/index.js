@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const { chromium } = require('playwright-core');
 
 // ---- CLI ------------------------------------------------------------------
@@ -37,7 +38,55 @@ function parseArgs(argv) {
 
 function toUrl(input) {
   if (/^https?:\/\//.test(input) || input.startsWith('file:')) return input;
-  return 'file:///' + path.resolve(input).replace(/\\/g, '/');
+  return 'file:///' + encodeURI(path.resolve(input).replace(/\\/g, '/'));
+}
+
+// Sandboxes often can't reach unpkg/jsdelivr. Serve CDN scripts from locally
+// vendored node_modules (byte-identical to the npm tarball → subresource
+// integrity hashes still pass), and abort web-font requests so networkidle
+// settles (figmalib supplies its own fonts).
+const MIME = { '.js': 'application/javascript', '.mjs': 'application/javascript',
+               '.jsx': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
+               '.map': 'application/json', '.html': 'text/html', '.htm': 'text/html',
+               '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+               '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+               '.ttf': 'font/ttf', '.otf': 'font/otf', '.woff': 'font/woff', '.woff2': 'font/woff2',
+               '.mp4': 'video/mp4' };
+
+// Babel-in-browser fetches the .jsx modules via XHR, which file:// blocks
+// (CORS). Serve the input's directory over a throwaway local HTTP server so
+// real React apps load.
+function startStaticServer(rootDir) {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      try {
+        const rel = decodeURIComponent((req.url || '/').split('?')[0]);
+        const file = path.normalize(path.join(rootDir, rel));
+        if (!file.startsWith(rootDir)) { res.writeHead(403); return res.end(); }
+        const body = fs.readFileSync(file);
+        res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+                             'access-control-allow-origin': '*' });
+        res.end(body);
+      } catch (e) { res.writeHead(404); res.end('not found'); }
+    });
+    server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+}
+async function setupCdnRoutes(page) {
+  const nm = path.join(__dirname, 'node_modules');
+  await page.route(/(unpkg\.com|cdn\.jsdelivr\.net\/npm)\//, (route) => {
+    try {
+      const u = new URL(route.request().url());
+      const segs = u.pathname.replace(/^\/(npm\/)?/, '').split('/');
+      let pkg, rest;
+      if (segs[0].startsWith('@')) { pkg = segs[0] + '/' + segs[1].replace(/@.*/, ''); rest = segs.slice(2).join('/'); }
+      else { pkg = segs[0].replace(/@.*/, ''); rest = segs.slice(1).join('/'); }
+      const file = path.join(nm, pkg, rest);
+      const body = fs.readFileSync(file);
+      route.fulfill({ status: 200, contentType: MIME[path.extname(file)] || 'application/octet-stream', body });
+    } catch (e) { route.abort(); }
+  });
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
 }
 
 // ---- browser-side collector ----------------------------------------------
@@ -241,8 +290,19 @@ function rasterMarks(n, acc) {
   console.log(`launching ${a.browser} ...`);
   const browser = await chromium.launch({ channel: a.browser, headless: true });
   const page = await browser.newPage({ viewport: { width: a.vw, height: a.vh }, deviceScaleFactor: a.scale });
-  console.log(`loading ${toUrl(a.input)}`);
-  await page.goto(toUrl(a.input), { waitUntil: 'networkidle' }).catch(() => {});
+  await setupCdnRoutes(page);
+
+  // Serve local files over HTTP so XHR-based loaders (Babel-in-browser) work.
+  let server = null, pageUrl;
+  if (/^https?:\/\//.test(a.input)) {
+    pageUrl = a.input;
+  } else {
+    const abs = path.resolve(a.input);
+    server = await startStaticServer(path.dirname(abs));
+    pageUrl = `http://127.0.0.1:${server.address().port}/${encodeURIComponent(path.basename(abs))}`;
+  }
+  console.log(`loading ${pageUrl}`);
+  await page.goto(pageUrl, { waitUntil: 'networkidle' }).catch(() => {});
   await page.waitForTimeout(a.wait);
   await page.screenshot({ path: out.replace(/\.canvas\.json$|\.json$/, '') + '.web.png' }).catch(() => {});
 
@@ -263,6 +323,7 @@ function rasterMarks(n, acc) {
     finally { if (m.hideKids) await page.evaluate(setKidsHiddenFn, { id: m.id, hidden: false }); }
   }
   await browser.close();
+  if (server) server.close();
 
   nameCounter = 0;
   const rootFrame = mapNode(tree, null);
