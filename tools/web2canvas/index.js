@@ -241,19 +241,27 @@ function collectorFn(rootSelector) {
   return { tree, rootW: rr.width, rootH: rr.height };
 }
 
-// Hide a tagged element's content (children + its own text) for a bg-only shot.
-function setBgOnlyFn({ id, on }) {
-  const el = document.querySelector(`[data-w2c="${id}"]`);
-  if (!el) return;
+// Isolate a tagged element for its screenshot. element.screenshot captures the
+// page clipped to the element's box, so overlapping FOREGROUND content (siblings
+// drawn on top, e.g. text over a background image) would be baked into the
+// sprite and re-emitted as its own nodes (duplicate). Hide everything, then
+// reveal only the target:
+//  - hideKids (background raster): keep the target's children + own text hidden
+//    so only its own background/border is captured (children emit separately).
+//  - else (whole-element raster, <img>/<svg>): reveal the whole subtree.
+function setBgOnlyFn({ id, on, hideKids }) {
+  const all = document.querySelectorAll('body *');
   if (on) {
-    el.setAttribute('data-w2c-c', el.style.color || ' ');
-    el.style.color = 'transparent';
-    for (const c of el.children) c.style.visibility = 'hidden';
+    for (const e of all) e.style.visibility = 'hidden';
+    const el = document.querySelector(`[data-w2c="${id}"]`);
+    if (!el) return;
+    el.style.visibility = 'visible';
+    if (hideKids) { el.setAttribute('data-w2c-c', el.style.color || '~'); el.style.color = 'transparent'; }
+    else el.querySelectorAll('*').forEach(d => { d.style.visibility = 'visible'; });
   } else {
-    const saved = el.getAttribute('data-w2c-c');
-    el.style.color = (saved === ' ' || saved == null) ? '' : saved;
-    el.removeAttribute('data-w2c-c');
-    for (const c of el.children) c.style.visibility = '';
+    for (const e of all) e.style.visibility = '';
+    const el = document.querySelector(`[data-w2c="${id}"]`);
+    if (el) { const s = el.getAttribute('data-w2c-c'); if (s != null) { el.style.color = (s === '~' ? '' : s); el.removeAttribute('data-w2c-c'); } }
   }
 }
 
@@ -457,11 +465,11 @@ function rasterMarks(n, acc) {
     for (const m of marks) {
       const loc = page.locator(`[data-w2c="${m.id}"]`);
       try {
-        if (!m.whole) await page.evaluate(setBgOnlyFn, { id: m.id, on: true });
+        await page.evaluate(setBgOnlyFn, { id: m.id, on: true, hideKids: !m.whole });
         await loc.screenshot({ path: path.join(imagesDir, `w2c_${statePrefix}${m.id}.png`), omitBackground: true });
         totShot++;
       } catch (e) { /* not screenshot-able */ }
-      finally { if (!m.whole) await page.evaluate(setBgOnlyFn, { id: m.id, on: false }); }
+      finally { await page.evaluate(setBgOnlyFn, { id: m.id, on: false, hideKids: !m.whole }); }
     }
     totMarks += marks.length;
 

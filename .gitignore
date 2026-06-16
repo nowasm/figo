@@ -12,3 +12,4 @@ wallet_out/
 node_modules/
 tools/web2canvas/test/*.canvas.json
 hud_out/
+search_out/
