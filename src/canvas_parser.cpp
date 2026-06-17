@@ -1047,6 +1047,7 @@ std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {
     node->parent = parent;
     node->id = j.contains("guid") ? symbolIDKey(j["guid"]) : std::string();
     node->name = jstr(j, "name");
+    node->compType = jstr(j, "comp", "");  // web2canvas source-component type (component root only)
     node->type = inferCanvasNodeType(j, depth);
     node->visible = jbool(j, "visible", true);
     node->opacity = jfloat(j, "opacity", 1.0f);

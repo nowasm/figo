@@ -14,4 +14,6 @@ tools/web2canvas/test/*.canvas.json
 hud_out/
 search_out/
 hud_app/
+hud_popups/
+hud_full/
 wallet_pf/

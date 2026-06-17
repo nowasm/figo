@@ -202,6 +202,13 @@ static const figmalib::Paint* solidFill(const Node& n) {
         if (p.visible && p.type == figmalib::PaintType::Solid) return &p;
     return nullptr;
 }
+// 8-bit-quantized color inequality (matches how colors are emitted/grouped).
+static bool colorNe(const figmalib::Color& a, const figmalib::Color& b) {
+    return std::lround(a.r * 255) != std::lround(b.r * 255) ||
+           std::lround(a.g * 255) != std::lround(b.g * 255) ||
+           std::lround(a.b * 255) != std::lround(b.b * 255) ||
+           std::lround(a.a * 255) != std::lround(b.a * 255);
+}
 static bool hasVisibleStroke(const Node& n) {
     for (const auto& p : n.strokes)
         if (p.visible) return true;
@@ -380,33 +387,45 @@ struct Converter {
     // ---- prefab extraction (--prefabs) ----
     bool prefabs = false;
     bool inComponent = false;  // true while emitting a component scene (no nesting-instances)
+    std::set<std::string> noPrefab;  // compTypes never extracted (generic wrappers: HPanel…)
     struct Comp {
         std::string name;            // unique component name / file stem
-        const Node* canon = nullptr; // canonical instance
-        Node* frame = nullptr;       // its top-level frame (for render context)
+        const Node* canon = nullptr; // canonical (superset) instance
+        Node* frame = nullptr;       // canon's top-level frame (for render context)
         int count = 0;
         bool extracted = false;
+        std::vector<std::pair<const Node*, Node*>> insts;  // (instance node, its frame)
     };
-    std::map<std::string, Comp> compBySig;  // structural signature -> component
+    std::map<std::string, Comp> compBySig;  // component TYPE (compType) -> component
 
     // Structural signature: groups visually-identical components regardless of
     // text content / text box geometry (those become per-instance overrides).
     // Includes node types, sizes, fills (color/image ref), corners, strokes,
     // effects, and non-text children's relative positions.
-    std::string sig(const Node& n) const {
+    // struct_ = a STRUCTURAL signature: also ignore the specific image ref (a
+    // per-instance avatar/thumb) so same-component instances differing only in
+    // their sprite still group — the differing sprite becomes an instance
+    // override. Plain sig() keeps the ref (pixel-identical grouping).
+    std::string sig(const Node& n, bool struct_ = false) const {
         std::string s = std::to_string((int)n.type);
         if (n.type == NodeType::Text) {
-            s += "T" + std::to_string((int)(n.textStyle.fontSize + 0.5f)) + n.textStyle.fontFamily;
+            // struct_ ignores font size too (a heading vs label of the same
+            // component slot still aligns; size becomes a per-instance override).
+            s += struct_ ? "T" : ("T" + std::to_string((int)(n.textStyle.fontSize + 0.5f)) + n.textStyle.fontFamily);
         } else {
-            s += "#" + std::to_string((int)std::lround(n.width)) + "x" +
-                 std::to_string((int)std::lround(n.height));
+            // struct_ = pure shape: drop size, solid-color VALUES, and image refs
+            // (all become per-instance overrides) so every instance of a source
+            // component collapses to ONE prefab. Keep fill PRESENCE + kind and
+            // stroke/corner/effect flags so genuinely different shapes stay apart.
+            if (!struct_) s += "#" + std::to_string((int)std::lround(n.width)) + "x" +
+                               std::to_string((int)std::lround(n.height));
             for (const auto& p : n.fills) {
                 if (!p.visible) continue;
                 if (p.type == figmalib::PaintType::Solid) {
-                    char c[10]; std::snprintf(c, sizeof(c), "s%02x%02x%02x",
-                        (int)(p.color.r * 255), (int)(p.color.g * 255), (int)(p.color.b * 255));
-                    s += c;
-                } else if (p.type == figmalib::PaintType::Image) s += "i" + p.imageRef;
+                    if (struct_) s += "s";
+                    else { char c[10]; std::snprintf(c, sizeof(c), "s%02x%02x%02x",
+                        (int)(p.color.r * 255), (int)(p.color.g * 255), (int)(p.color.b * 255)); s += c; }
+                } else if (p.type == figmalib::PaintType::Image) s += struct_ ? "i" : "i" + p.imageRef;
                 else s += "g";
             }
             if (!n.strokes.empty()) s += "k";
@@ -415,13 +434,32 @@ struct Converter {
         }
         s += "{";
         for (const auto& c : n.children) {
-            if (c->type != NodeType::Text)
+            if (!struct_ && c->type != NodeType::Text)
                 s += "@" + std::to_string((int)std::lround(c->relativeTransform.m02)) + "," +
                      std::to_string((int)std::lround(c->relativeTransform.m12));
-            s += sig(*c) + ";";
+            s += sig(*c, struct_) + ";";
         }
         s += "}";
         return s;
+    }
+
+    // Grouping key for prefab extraction: a source component (web2canvas compType
+    // on its root) groups by TYPE + structural sig, so all instances of the type
+    // collapse to one prefab (sprite/text differences become per-instance
+    // overrides). Non-component containers fall back to a pixel-exact sig.
+    std::string groupKey(const Node& n) const {
+        // Group by source-component TYPE + structural shape (size/color/image/text
+        // ignored → those become per-instance overrides). Instances of a type that
+        // share a shape collapse to one prefab; a genuinely different shape
+        // (a conditional child nested in the content) forms another variant —
+        // merging those into one prefab can't be done without breaking layout.
+        return n.compType + "|" + sig(n, true);
+    }
+    // First visible image-fill ref of a node (empty if none).
+    static std::string imageRefOf(const Node& n) {
+        for (const auto& p : n.fills)
+            if (p.visible && p.type == figmalib::PaintType::Image) return p.imageRef;
+        return "";
     }
 
     // Count descendants (cheap gate against extracting trivial sub-groups).
@@ -438,11 +476,15 @@ struct Converter {
         std::function<void(Node&)> rec = [&](Node& n) {
             for (auto& c : n.children) {
                 Node& cn = *c;
-                if (!cn.children.empty() && !cn.name.empty() && cn.type != NodeType::Text &&
+                // Only SOURCE components become prefabs (web2canvas compType from
+                // the React fiber) — not anonymous structural containers, which
+                // would extract as ugly div_N scenes. desc>=3 still gates trivia.
+                if (!cn.compType.empty() && !cn.children.empty() && cn.type != NodeType::Text &&
                     !isVectorIcon(cn) && cn.width > 4 && cn.height > 4 && descendants(cn) >= 3) {
-                    auto& comp = compBySig[sig(cn)];
+                    auto& comp = compBySig[groupKey(cn)];
                     comp.count++;
-                    if (!comp.canon) { comp.canon = &cn; comp.name = cn.name; comp.frame = frame; }
+                    comp.insts.push_back({ &cn, frame });
+                    if (comp.name.empty()) comp.name = cn.compType;
                 }
                 rec(cn);
             }
@@ -452,7 +494,7 @@ struct Converter {
 
     const Comp* extractedComponent(const Node& n) {
         if (!prefabs || inComponent || n.children.empty() || n.type == NodeType::Text) return nullptr;
-        auto it = compBySig.find(sig(n));
+        auto it = compBySig.find(groupKey(n));
         return (it != compBySig.end() && it->second.extracted) ? &it->second : nullptr;
     }
 
@@ -909,38 +951,61 @@ struct Converter {
         return b.w >= 2 * r + 2 && b.h >= 2 * r + 2;
     }
 
-    // Per-instance overrides vs the canonical component: differing TEXT nodes
-    // (content / box). Child names follow CANON's tree (same naming the
-    // component scene used), so the override path matches the instanced child.
+    void emitOffsets(const Node& ic) {
+        body += "offset_left = " + num(ic.relativeTransform.m02) + "\n";
+        body += "offset_top = " + num(ic.relativeTransform.m12) + "\n";
+        body += "offset_right = " + num(ic.relativeTransform.m02 + ic.width) + "\n";
+        body += "offset_bottom = " + num(ic.relativeTransform.m12 + ic.height) + "\n";
+    }
+    // Per-instance overrides vs the canon. The grouping key includes the
+    // structural shape, so canon and instance have the SAME child sequence —
+    // children align by index. Each differing leaf gets the override it needs:
+    // offset/size, text, font color, solid fill color, or a re-baked texture.
     void emitInstanceOverrides(const Node& canon, const Node& inst, const std::string& parentPath) {
         std::map<std::string, int> used;
         used["__bg"] = 1;
+        // A container's solid background is a `__bg` ColorRect; override its color.
+        if (!canon.children.empty())
+        if (const auto* cb = solidFill(canon)) if (const auto* ib = solidFill(inst))
+            if (colorNe(cb->color, ib->color)) {
+                body += "\n[node name=\"__bg\" parent=\"" + parentPath + "\"]\n";
+                body += "color = " + colorLit(ib->color) + "\n";
+            }
         const size_t cnt = std::min(canon.children.size(), inst.children.size());
         for (size_t i = 0; i < cnt; ++i) {
             const Node& cc = *canon.children[i];
-            const Node& ic = *inst.children[i];
             std::string fb = "Node" + std::to_string(i);
             std::string base = sanitizeName(cc.name, fb.c_str());
             std::string uniq = base;
             int k = 2;
             while (used.count(uniq)) uniq = base + "_" + std::to_string(k++);
             used[uniq] = 1;
+            const Node& ic = *inst.children[i];
+            const bool posDiff =
+                std::lround(cc.width) != std::lround(ic.width) ||
+                std::lround(cc.height) != std::lround(ic.height) ||
+                std::lround(cc.relativeTransform.m02) != std::lround(ic.relativeTransform.m02) ||
+                std::lround(cc.relativeTransform.m12) != std::lround(ic.relativeTransform.m12);
             if (cc.type == NodeType::Text) {
-                const bool diff = cc.characters != ic.characters ||
-                    std::lround(cc.width) != std::lround(ic.width) ||
-                    std::lround(cc.relativeTransform.m02) != std::lround(ic.relativeTransform.m02) ||
-                    std::lround(cc.relativeTransform.m12) != std::lround(ic.relativeTransform.m12);
-                if (diff) {
+                const auto *fc = solidFill(cc), *fi = solidFill(ic);
+                const bool colDiff = fc && fi && colorNe(fc->color, fi->color);
+                if (posDiff || cc.characters != ic.characters || colDiff) {
                     body += "\n[node name=\"" + uniq + "\" parent=\"" + parentPath + "\"]\n";
-                    body += "offset_left = " + num(ic.relativeTransform.m02) + "\n";
-                    body += "offset_top = " + num(ic.relativeTransform.m12) + "\n";
-                    body += "offset_right = " + num(ic.relativeTransform.m02 + ic.width) + "\n";
-                    body += "offset_bottom = " + num(ic.relativeTransform.m12 + ic.height) + "\n";
+                    emitOffsets(ic);
                     body += "text = \"" + escapeStr(ic.characters) + "\"\n";
-                    if (const auto* f = solidFill(ic))
-                        body += "theme_override_colors/font_color = " + colorLit(f->color) + "\n";
+                    if (fi) body += "theme_override_colors/font_color = " + colorLit(fi->color) + "\n";
                 }
             } else {
+                const std::string ci = imageRefOf(cc), ii = imageRefOf(ic);
+                const bool imgDiff = !ii.empty() && ii != ci;
+                const auto *lc = solidFill(cc), *li = solidFill(ic);
+                const bool leafColDiff = cc.children.empty() && lc && li && colorNe(lc->color, li->color);
+                if (posDiff || imgDiff || leafColDiff) {
+                    body += "\n[node name=\"" + uniq + "\" parent=\"" + parentPath + "\"]\n";
+                    if (posDiff) emitOffsets(ic);
+                    if (imgDiff) { Baked b = bake(ic, superScale); if (b.ok) body += "texture = ExtResource(\"" + useTexture(b.hash) + "\")\n"; }
+                    if (leafColDiff) body += "color = " + colorLit(li->color) + "\n";
+                }
                 emitInstanceOverrides(cc, ic, parentPath + "/" + uniq);
             }
         }
@@ -1075,6 +1140,7 @@ int main(int argc, char** argv) {
     fs::path fontsDir;
     int scale = 2;
     bool prefabs = false;
+    std::set<std::string> noPrefabArg;
     for (int i = 2; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--frame" && i + 1 < argc)
@@ -1085,6 +1151,14 @@ int main(int argc, char** argv) {
             scale = std::max(1, atoi(argv[++i]));
         else if (a == "--prefabs")
             prefabs = true;
+        else if (a == "--no-prefab" && i + 1 < argc) {
+            std::string list = argv[++i], tok;
+            for (char c : list) {
+                if (c == ',') { if (!tok.empty()) noPrefabArg.insert(tok); tok.clear(); }
+                else tok.push_back(c);
+            }
+            if (!tok.empty()) noPrefabArg.insert(tok);
+        }
         else if (!a.empty() && a[0] != '-')
             outDir = a;
     }
@@ -1116,6 +1190,7 @@ int main(int argc, char** argv) {
 
     Converter cv;
     cv.ui = ui.get();
+    cv.noPrefab = noPrefabArg;
     cv.outDir = outDir;
     cv.spritesDir = spritesDir;
     cv.superScale = scale;
@@ -1134,7 +1209,22 @@ int main(int argc, char** argv) {
         int compCount = 0;
         for (auto& kv : cv.compBySig) {
             Converter::Comp& comp = kv.second;
-            if (comp.count < 2 || !comp.canon) continue;
+            if (comp.count < 2 || comp.insts.empty()) continue;
+            // Canon = the SUPERSET instance (most descendants) so the prefab holds
+            // every conditional child; leaner instances hide what they lack.
+            auto best = comp.insts[0];
+            for (auto& it : comp.insts)
+                if (Converter::descendants(*it.first) > Converter::descendants(*best.first)) best = it;
+            comp.canon = best.first; comp.frame = best.second;
+            // Screen-level guard: a component covering ~the whole frame is a SCREEN
+            // container (Lobby, RoomSearch, HudC…), not a reusable widget. Captured
+            // multiple times (one per popup flow) it would look "repeated" and
+            // swallow the real widgets inside it — never extract it.
+            if (comp.canon->width >= comp.frame->width * 0.9f &&
+                comp.canon->height >= comp.frame->height * 0.9f) continue;
+            // User-declared generic wrappers (e.g. --no-prefab HPanel,HRow): a
+            // layout primitive used for unrelated content — never extract it.
+            if (cv.noPrefab.count(comp.canon->compType)) continue;
             std::string base;
             for (char c : sanitizeName(comp.name, "Comp"))
                 base.push_back((std::isalnum((unsigned char)c) || c == '-' || c == '_') ? c : '_');

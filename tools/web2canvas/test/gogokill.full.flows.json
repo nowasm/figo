@@ -1,0 +1,14 @@
+[
+  { "name": "lobby",         "nav": "lobby" },
+  { "name": "search",        "nav": "search" },
+  { "name": "room",          "nav": "room" },
+  { "name": "room_settings", "nav": "room", "do": ["click:text=房间设置"] },
+  { "name": "role",          "nav": "role" },
+  { "name": "game",          "nav": "game" },
+  { "name": "game_settings", "nav": "game", "do": ["click:[title=\"游戏设置\"]"] },
+  { "name": "game_roleinfo", "nav": "game", "do": ["click:[title=\"查看职业说明\"]"] },
+  { "name": "game_death",    "nav": "game", "do": ["click:[title^=\"调试\"]", "click:text=模拟被击杀"] },
+  { "name": "meeting",       "nav": "meeting" },
+  { "name": "victory",       "nav": "victory" },
+  { "name": "aftermath",     "nav": "aftermath" }
+]

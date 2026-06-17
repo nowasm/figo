@@ -27,7 +27,7 @@ built (see repo root; the core-only `build_godot` target is enough).
 ```
 node html2godot.js <url|file.html> --out <godotDir> \
      [--states "a,b,c"] [--fonts DIR] [--root SEL] [--viewport WxH] \
-     [--wait MS] [--browser msedge|chrome] [--fapp2godot <exe>]
+     [--wait MS] [--browser msedge|chrome] [--prefabs] [--ai-name] [--fapp2godot <exe>]
 ```
 
 `<godotDir>/` becomes an openable Godot 4 project: one `.tscn` per screen,
@@ -37,12 +37,16 @@ Add `--prefabs` to extract repeated components (cards, buttons, rows) into
 reusable `components/*.tscn` (PackedScenes) and instance them per screen with
 per-instance text overrides — real prefab reuse, not just inlined copies.
 
+Add `--ai-name` to name components by **what they look like** instead of their
+React/CSS class — a vision pass screenshots each component and asks the `claude`
+CLI to infer a `PascalCase` name (see [Component names](#component-names--ai-name)).
+
 ## Just the canvas.json
 
 ```
 node index.js <url|file.html> [-o out.canvas.json] [--root SEL]
-     [--viewport WxH] [--states "a,b,c"] [--nav-fn FN] [--fonts DIR]
-     [--browser msedge|chrome] [--wait MS] [--scale N]
+     [--viewport WxH] [--states "a,b,c"] [--flows FILE] [--nav-fn FN]
+     [--fonts DIR] [--browser msedge|chrome] [--wait MS] [--scale N]
 ```
 
 | flag | meaning |
@@ -50,9 +54,41 @@ node index.js <url|file.html> [-o out.canvas.json] [--root SEL]
 | `--root SEL` | element to capture (e.g. `#stage`); default `body` |
 | `--viewport WxH` | browser viewport; match the design's stage size for 1:1 |
 | `--states "a,b,c"` | capture multiple screens — calls `window.<navFn>(state)` per state, one top-level frame each |
+| `--flows FILE` | capture click-driven popups/overlays — a JSON array of captures, each with interaction steps (see below) |
 | `--nav-fn FN` | the global nav function (default `__nav`) |
+| `--nav-reset S` | sentinel state used to remount between captures (default `__w2c_reset__`) |
 | `--fonts DIR` | serve the project's `fonts.css` so text is measured at real widths |
+| `--ai-name` | name components from their rendered look via the `claude` CLI (vision) — see below |
 | `--scale N` | rasterization supersample (default 2) |
+
+## Popups & overlays: click-driven flows (`--flows`)
+
+`--states` only reaches screens behind a `window.__nav` hook. Popups, drawers and
+overlays opened **by clicking** need `--flows FILE` — a JSON array where each
+capture optionally navigates, then runs interaction **steps** before the
+screenshot. Each capture becomes one top-level frame -> one `.tscn`.
+
+```json
+[
+  { "name": "game",          "nav": "game" },
+  { "name": "game_settings", "nav": "game", "do": ["click:[title=\"游戏设置\"]"] },
+  { "name": "game_death",    "nav": "game", "do": ["click:[title^=\"调试\"]", "click:text=模拟被击杀"] }
+]
+```
+
+- `nav` (optional): the screen to navigate to first via `window.<navFn>`.
+- `do` / `steps`: a list of `verb:arg` steps run in order —
+  `click:<sel>`, `hover:<sel>` (Playwright selectors: `text=…`, CSS, `[attr=…]`),
+  `nav:<state>`, `wait:<ms>`. A bare string defaults to `click`.
+- Isolation is automatic: before each capture the target screen is remounted via
+  a sentinel state, so a popup opened in one capture never leaks into the next.
+
+The popup is captured **in context** — the dimmed screen behind a *card* (a
+partial overlay over a translucent scrim) is part of the frame, exactly as the
+browser composites it. But when an overlay **fills the whole root with a
+near-opaque backdrop** (alpha ≥ 0.85, e.g. a full-screen death screen), the
+content behind it is invisible, so the siblings under it are dropped and the
+frame contains only the overlay subtree — no wasted hidden game tree.
 
 ## Example — GOGO KILL HUD (8 screens → Godot)
 
@@ -63,14 +99,63 @@ node html2godot.js "<...>/html_ui_export/app/HUD C.html" --out hud_app \
   --states "lobby,search,room,role,game,meeting,victory,aftermath"
 ```
 
+## Text node names = semantic roles
+
+TEXT nodes are named by an inferred **role**, not their literal text (which is
+unstable and meaningless as a node id). `textRole()` classifies by content +
+context into: `username` (a short, punctuation-free string next to a portrait),
+`playerId`, `seatLabel`, `levelText`, `status`, `count` / `unit`, `amount`,
+`percent`, `icon`, `heading`, `buttonLabel` (text inside a `<button>`),
+`hintText` (long/sentence copy), else `labelText`. Duplicate sibling names get a
+`_2`/`_3` suffix downstream. The "near a portrait → username" signal uses
+`isAvatarish` (img/canvas/`image-slot`, a circular ≤72px element, or a square
+photo) — reliable on clean roster/list UIs; in dense HUDs full of circular
+icons/emblems a few labels may still be tagged `username`. The keyword sets in
+`textRole()` are the place to tune the vocabulary per project.
+
+## Component names (`--ai-name`)
+
+Without it, a container's name comes from a **rule**: its nearest React
+component (via fiber), else its first CSS class, else the tag (`div_0`). That's
+only as meaningful as the source markup — minified/utility classes and
+Babel-in-browser apps often yield `div_0`, `css-1abc`, or generic primitives.
+
+`--ai-name` replaces those with names inferred from **how the component
+actually looks**. The flow (in `index.js`):
+
+1. While collecting each screen, container nodes worth naming are tagged as
+   *candidates* — a top-level screen region, or a substantive component (≥3
+   descendants), bounded in size (not the whole frame, not a sub-text fragment).
+2. Each candidate is screenshotted **live, in its own screen** (the elements
+   only exist in the DOM while their screen is mounted).
+3. Structurally-identical candidates are deduped (so 11 identical player cards
+   are named once), the representatives are laid out in a numbered montage, and
+   the `claude` CLI is asked to name each from its picture
+   (`PlayerCard`, `HealthBar`, `CreateRoomButton`, `DailyTaskCard`, …).
+4. The name is written onto every member of each dedup group → it flows to the
+   `.tscn` node name, the sprite filename, and the `--prefabs` component scene.
+
+Notes:
+
+- **Hybrid, not all-or-nothing**: only candidates are AI-named; everything else
+  keeps its rule-based name. A good React component name (`PortraitC`, `Emblem`)
+  is left alone when that node isn't a candidate.
+- **Needs the `claude` CLI** on `PATH` (headless `claude -p`, reads the montage
+  via the `Read` tool). If a call fails or returns no JSON, that batch silently
+  falls back to rule-based names — the run still succeeds.
+- **Cost**: ~1 `claude` call per 24 unique components (one montage each), a few
+  seconds apiece. GOGO KILL's 8 screens = 228 candidates → 119 unique → 5 calls.
+- Intermediate montages + candidate shots are written under
+  `<out>/.ai-name/` (or `<godotDir>/.ai-name/` via `html2godot`) for inspection.
+
 ## Notes / limits
 
 - **CDN apps**: unpkg/jsdelivr requests are served from the vendored
   `node_modules` (byte-identical, so SRI `integrity` passes); Google Fonts are
   aborted (pass `--fonts` to use the project's local faces instead). Local files
   are served over a throwaway HTTP server so Babel's XHR module loading works.
-- **Multi-screen** needs a programmatic nav hook (`window.__nav`). Popups/
-  overlays opened only by clicks, and per-screen scroll content beyond the
-  viewport, are not captured yet.
+- **Multi-screen** needs a programmatic nav hook (`window.__nav`). Click-driven
+  popups/overlays are captured via `--flows` (above). Per-screen scroll content
+  beyond the viewport is not captured yet.
 - Each raster is screenshotted **in isolation** (everything else hidden) so
   foreground content never bleeds into a background sprite.

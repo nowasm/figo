@@ -1,0 +1,40 @@
+[
+  { "name": "lobby",            "nav": "lobby" },
+  { "name": "lobby_settings",   "nav": "lobby", "do": ["click:[title=\"游戏设置\"]"] },
+  { "name": "lobby_avatar",     "nav": "lobby", "do": ["click:[title=\"点击更换头像\"]"] },
+  { "name": "lobby_locker",     "nav": "lobby", "do": ["click:text=装扮"] },
+  { "name": "lobby_profile",    "nav": "lobby", "do": ["click:text=主教"] },
+  { "name": "lobby_chat",       "nav": "lobby", "do": ["click:[title=\"放大聊天\"]"] },
+  { "name": "lobby_gifts",      "nav": "lobby", "do": ["click:[title=\"送礼\"]"] },
+
+  { "name": "search",           "nav": "search" },
+  { "name": "search_password",  "nav": "search", "do": ["click:text=🔒 加入"] },
+
+  { "name": "room",             "nav": "room" },
+  { "name": "room_guest",       "nav": "room", "do": ["click:text=房客"] },
+  { "name": "room_settings",    "nav": "room", "do": ["click:text=房间设置"] },
+  { "name": "room_locker",      "nav": "room", "do": ["click:text=更换装扮"] },
+  { "name": "room_map",         "nav": "room", "do": ["click:text=选择地图"] },
+  { "name": "room_profile",     "nav": "room", "do": ["click:text=主教"] },
+
+  { "name": "role",             "nav": "role" },
+
+  { "name": "game",             "nav": "game" },
+  { "name": "game_roleinfo",    "nav": "game", "do": ["click:[title=\"查看职业说明\"]"] },
+  { "name": "game_settings",    "nav": "game", "do": ["click:[title=\"游戏设置\"]"] },
+  { "name": "game_map",         "nav": "game", "do": ["click:text=点击查看完整地图"] },
+  { "name": "game_death",       "nav": "game", "do": ["click:[title^=\"调试\"]", "click:text=模拟被击杀"] },
+
+  { "name": "game_bad",         "nav": "game", "side": "bad" },
+  { "name": "game_bad_roleinfo","nav": "game", "side": "bad", "do": ["click:[title=\"查看职业说明\"]"] },
+  { "name": "game_bad_armory",  "nav": "game", "side": "bad", "do": ["click:[title=\"打开军火库\"]"] },
+
+  { "name": "meeting_intro",    "nav": "meeting" },
+  { "name": "meeting_discuss",  "nav": "meeting", "do": ["click:text=进入会议"] },
+  { "name": "meeting_vote",     "nav": "meeting", "do": ["click:text=进入会议", "click:text=进入投票"] },
+  { "name": "meeting_result",   "nav": "meeting", "do": ["click:text=进入会议", "click:text=进入投票", "click:text=弃票", "click:text=确认投票"] },
+
+  { "name": "victory",          "nav": "victory" },
+  { "name": "aftermath",        "nav": "aftermath" },
+  { "name": "aftermath_profile","nav": "aftermath", "do": ["click:text=星野"] }
+]

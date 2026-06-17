@@ -4,8 +4,11 @@
 // -> .tscn + sprites + manifest), wiring the intermediate paths together.
 //
 //   node html2godot.js <url|file.html> --out <godotDir>
-//        [--states "a,b,c"] [--fonts DIR] [--root SEL] [--viewport WxH]
-//        [--wait MS] [--browser msedge|chrome] [--fapp2godot <exe>]
+//        [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--root SEL]
+//        [--viewport WxH] [--wait MS] [--browser msedge|chrome] [--fapp2godot <exe>]
+//
+// --states reaches screens behind a window.__nav hook; --flows captures
+// click-driven popups/overlays (a JSON array of captures with interaction steps).
 //
 // Result: <godotDir>/ is an openable Godot project — one .tscn per screen,
 // deduped sprites, bundled fonts, manifest.json, project.godot.
@@ -21,7 +24,7 @@ function arg(name, def) {
 const input = process.argv[2];
 const out = arg('--out', null);
 if (!input || input.startsWith('-') || !out) {
-  console.error('usage: html2godot <url|file.html> --out <godotDir> [--states ...] [--fonts DIR] [--root SEL] [--viewport WxH] [--wait MS] [--browser ...] [--fapp2godot <exe>]');
+  console.error('usage: html2godot <url|file.html> --out <godotDir> [--states ...] [--flows FILE] [--fonts DIR] [--root SEL] [--viewport WxH] [--wait MS] [--browser ...] [--prefabs] [--ai-name] [--fapp2godot <exe>]');
   process.exit(2);
 }
 
@@ -45,11 +48,12 @@ if (!fapp2godot || !fs.existsSync(fapp2godot)) {
 
 const fonts = arg('--fonts', null);
 const passthrough = [];
-for (const k of ['--states', '--root', '--viewport', '--wait', '--browser', '--scale']) {
+for (const k of ['--states', '--flows', '--root', '--viewport', '--wait', '--browser', '--scale', '--nav-fn', '--nav-reset']) {
   const v = arg(k, null);
   if (v != null) passthrough.push(k, v);
 }
 if (fonts) passthrough.push('--fonts', fonts);
+if (process.argv.includes('--ai-name')) passthrough.push('--ai-name');  // vision-infer component names
 
 console.log('=== web2canvas ===');
 execFileSync(process.execPath, [path.join(here, 'index.js'), input, '-o', canvas, ...passthrough],
@@ -59,6 +63,8 @@ console.log('=== fapp2godot ===');
 const f2gArgs = [canvas, path.resolve(out)];
 if (fonts) f2gArgs.push('--fonts', fonts);
 if (process.argv.includes('--prefabs')) f2gArgs.push('--prefabs');
+const noPrefab = arg('--no-prefab', null);  // comma list of generic wrapper component types to inline
+if (noPrefab) f2gArgs.push('--no-prefab', noPrefab);
 execFileSync(fapp2godot, f2gArgs, { stdio: 'inherit' });
 
 console.log(`\nRESULT: OK -> ${path.resolve(out)} (open in Godot 4)`);

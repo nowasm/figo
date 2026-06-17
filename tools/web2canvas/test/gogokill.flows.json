@@ -1,0 +1,6 @@
+[
+  { "name": "game",          "nav": "game" },
+  { "name": "game_settings", "nav": "game", "do": ["click:[title=\"游戏设置\"]"] },
+  { "name": "game_roleinfo", "nav": "game", "do": ["click:[title=\"查看职业说明\"]"] },
+  { "name": "game_death",    "nav": "game", "do": ["click:[title^=\"调试\"]", "click:text=模拟被击杀"] }
+]

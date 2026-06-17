@@ -219,6 +219,11 @@ struct NodeData {
     // Instances: id of the COMPONENT this instance was created from.
     std::string componentId;
 
+    // web2canvas: the SOURCE component type that rendered this node (from the
+    // React fiber), set only on a component's root element. fapp2godot groups
+    // every instance of a type into one prefab. Empty for plain DOM elements.
+    std::string compType;
+
     // Prototype navigation, when authored in Figma: clicking this node goes
     // to the target frame. FigmaUI wires these automatically.
     std::string transitionNodeId;  // destination frame id ("" = none)
