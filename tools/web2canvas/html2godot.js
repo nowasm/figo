@@ -58,6 +58,7 @@ execFileSync(process.execPath, [path.join(here, 'index.js'), input, '-o', canvas
 console.log('=== fapp2godot ===');
 const f2gArgs = [canvas, path.resolve(out)];
 if (fonts) f2gArgs.push('--fonts', fonts);
+if (process.argv.includes('--prefabs')) f2gArgs.push('--prefabs');
 execFileSync(fapp2godot, f2gArgs, { stdio: 'inherit' });
 
 console.log(`\nRESULT: OK -> ${path.resolve(out)} (open in Godot 4)`);

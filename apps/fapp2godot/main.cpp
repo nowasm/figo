@@ -24,8 +24,10 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -375,6 +377,85 @@ struct Converter {
     // Bundled fonts: (familyNorm, weight, italic) -> res path; populated by main.
     std::vector<FontEntry> fonts;
 
+    // ---- prefab extraction (--prefabs) ----
+    bool prefabs = false;
+    bool inComponent = false;  // true while emitting a component scene (no nesting-instances)
+    struct Comp {
+        std::string name;            // unique component name / file stem
+        const Node* canon = nullptr; // canonical instance
+        Node* frame = nullptr;       // its top-level frame (for render context)
+        int count = 0;
+        bool extracted = false;
+    };
+    std::map<std::string, Comp> compBySig;  // structural signature -> component
+
+    // Structural signature: groups visually-identical components regardless of
+    // text content / text box geometry (those become per-instance overrides).
+    // Includes node types, sizes, fills (color/image ref), corners, strokes,
+    // effects, and non-text children's relative positions.
+    std::string sig(const Node& n) const {
+        std::string s = std::to_string((int)n.type);
+        if (n.type == NodeType::Text) {
+            s += "T" + std::to_string((int)(n.textStyle.fontSize + 0.5f)) + n.textStyle.fontFamily;
+        } else {
+            s += "#" + std::to_string((int)std::lround(n.width)) + "x" +
+                 std::to_string((int)std::lround(n.height));
+            for (const auto& p : n.fills) {
+                if (!p.visible) continue;
+                if (p.type == figmalib::PaintType::Solid) {
+                    char c[10]; std::snprintf(c, sizeof(c), "s%02x%02x%02x",
+                        (int)(p.color.r * 255), (int)(p.color.g * 255), (int)(p.color.b * 255));
+                    s += c;
+                } else if (p.type == figmalib::PaintType::Image) s += "i" + p.imageRef;
+                else s += "g";
+            }
+            if (!n.strokes.empty()) s += "k";
+            if (cornerR(n) > 0) s += "r";
+            if (hasVisibleEffect(n)) s += "e";
+        }
+        s += "{";
+        for (const auto& c : n.children) {
+            if (c->type != NodeType::Text)
+                s += "@" + std::to_string((int)std::lround(c->relativeTransform.m02)) + "," +
+                     std::to_string((int)std::lround(c->relativeTransform.m12));
+            s += sig(*c) + ";";
+        }
+        s += "}";
+        return s;
+    }
+
+    // Count descendants (cheap gate against extracting trivial sub-groups).
+    static int descendants(const Node& n) {
+        int c = 0;
+        for (const auto& k : n.children) c += 1 + descendants(*k);
+        return c;
+    }
+
+    // Tally repeated component candidates across a frame's tree. Only containers
+    // with real substance (>=3 descendants) so we extract meaningful components
+    // (cards, buttons), not every 2-label sub-group.
+    void scanComponents(Node* frame) {
+        std::function<void(Node&)> rec = [&](Node& n) {
+            for (auto& c : n.children) {
+                Node& cn = *c;
+                if (!cn.children.empty() && !cn.name.empty() && cn.type != NodeType::Text &&
+                    !isVectorIcon(cn) && cn.width > 4 && cn.height > 4 && descendants(cn) >= 3) {
+                    auto& comp = compBySig[sig(cn)];
+                    comp.count++;
+                    if (!comp.canon) { comp.canon = &cn; comp.name = cn.name; comp.frame = frame; }
+                }
+                rec(cn);
+            }
+        };
+        rec(*frame);
+    }
+
+    const Comp* extractedComponent(const Node& n) {
+        if (!prefabs || inComponent || n.children.empty() || n.type == NodeType::Text) return nullptr;
+        auto it = compBySig.find(sig(n));
+        return (it != compBySig.end() && it->second.extracted) ? &it->second : nullptr;
+    }
+
     // per-frame state
     std::string body;
     struct Ext {
@@ -649,6 +730,22 @@ struct Converter {
             else place(x, y, w, h, n.constraintH, n.constraintV, pw, ph);
         };
 
+        // Prefab reuse: a repeated component is instanced from its PackedScene,
+        // with per-instance text overrides; its subtree is not re-emitted.
+        if (const Comp* comp = extractedComponent(n)) {
+            std::string id = useExt("res://components/" + comp->name + ".tscn", "PackedScene", "scn_");
+            body += "\n[node name=\"" + name + "\" parent=\"" + parentAttr +
+                    "\" instance=ExtResource(\"" + id + "\")]\n";
+            placeNode(lx, ly, n.width, n.height);
+            if (!n.visible) body += "visible = false\n";
+            if (n.opacity < 0.999f) body += "modulate = Color(1, 1, 1, " + num(n.opacity) + ")\n";
+            emitInstanceOverrides(*comp->canon, n, childAttr);
+            json nj;
+            nj["name"] = name; nj["type"] = "instance"; nj["component"] = comp->name;
+            frameNodes.push_back(nj);
+            return;
+        }
+
         json nodeJson;
         nodeJson["name"] = name;
         nodeJson["path"] = childAttr;
@@ -809,6 +906,67 @@ struct Converter {
         return b.w >= 2 * r + 2 && b.h >= 2 * r + 2;
     }
 
+    // Per-instance overrides vs the canonical component: differing TEXT nodes
+    // (content / box). Child names follow CANON's tree (same naming the
+    // component scene used), so the override path matches the instanced child.
+    void emitInstanceOverrides(const Node& canon, const Node& inst, const std::string& parentPath) {
+        std::map<std::string, int> used;
+        used["__bg"] = 1;
+        const size_t cnt = std::min(canon.children.size(), inst.children.size());
+        for (size_t i = 0; i < cnt; ++i) {
+            const Node& cc = *canon.children[i];
+            const Node& ic = *inst.children[i];
+            std::string fb = "Node" + std::to_string(i);
+            std::string base = sanitizeName(cc.name, fb.c_str());
+            std::string uniq = base;
+            int k = 2;
+            while (used.count(uniq)) uniq = base + "_" + std::to_string(k++);
+            used[uniq] = 1;
+            if (cc.type == NodeType::Text) {
+                const bool diff = cc.characters != ic.characters ||
+                    std::lround(cc.width) != std::lround(ic.width) ||
+                    std::lround(cc.relativeTransform.m02) != std::lround(ic.relativeTransform.m02) ||
+                    std::lround(cc.relativeTransform.m12) != std::lround(ic.relativeTransform.m12);
+                if (diff) {
+                    body += "\n[node name=\"" + uniq + "\" parent=\"" + parentPath + "\"]\n";
+                    body += "offset_left = " + num(ic.relativeTransform.m02) + "\n";
+                    body += "offset_top = " + num(ic.relativeTransform.m12) + "\n";
+                    body += "offset_right = " + num(ic.relativeTransform.m02 + ic.width) + "\n";
+                    body += "offset_bottom = " + num(ic.relativeTransform.m12 + ic.height) + "\n";
+                    body += "text = \"" + escapeStr(ic.characters) + "\"\n";
+                    if (const auto* f = solidFill(ic))
+                        body += "theme_override_colors/font_color = " + colorLit(f->color) + "\n";
+                }
+            } else {
+                emitInstanceOverrides(cc, ic, parentPath + "/" + uniq);
+            }
+        }
+    }
+
+    // Emit a component's PackedScene (components/<name>.tscn), self-contained.
+    void emitComponentScene(Comp& comp) {
+        ui->setViewport((uint32_t)std::ceil(std::max(1.0f, comp.frame->width)),
+                        (uint32_t)std::ceil(std::max(1.0f, comp.frame->height)));
+        curW = (uint32_t)std::ceil(std::max(1.0f, comp.frame->width));
+        curH = (uint32_t)std::ceil(std::max(1.0f, comp.frame->height));
+        ui->selectFrame(comp.frame->name);
+        ui->render();
+
+        body.clear(); frameExtId.clear(); frameExt.clear(); frameNodes = json::array();
+        inComponent = true;
+        const uint32_t w = (uint32_t)std::ceil(std::max(1.0f, comp.canon->width));
+        const uint32_t h = (uint32_t)std::ceil(std::max(1.0f, comp.canon->height));
+        emit(*const_cast<Node*>(comp.canon), "", comp.name, (float)w, (float)h);
+        inComponent = false;
+
+        std::string head = "[gd_scene load_steps=" + std::to_string(frameExt.size() + 1) + " format=3]\n";
+        for (auto& e : frameExt)
+            head += "\n[ext_resource type=\"" + e.type + "\" path=\"" + e.path + "\" id=\"" + e.id + "\"]\n";
+        fs::create_directories(outDir / "components");
+        std::ofstream f(outDir / "components" / (comp.name + ".tscn"), std::ios::binary);
+        f << head << body;
+    }
+
     void convertFrame(Node* frame) {
         curW = (uint32_t)std::ceil(std::max(1.0f, frame->width));
         curH = (uint32_t)std::ceil(std::max(1.0f, frame->height));
@@ -913,6 +1071,7 @@ int main(int argc, char** argv) {
     std::string onlyFrame;
     fs::path fontsDir;
     int scale = 2;
+    bool prefabs = false;
     for (int i = 2; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--frame" && i + 1 < argc)
@@ -921,6 +1080,8 @@ int main(int argc, char** argv) {
             fontsDir = argv[++i];
         else if (a == "--scale" && i + 1 < argc)
             scale = std::max(1, atoi(argv[++i]));
+        else if (a == "--prefabs")
+            prefabs = true;
         else if (!a.empty() && a[0] != '-')
             outDir = a;
     }
@@ -958,6 +1119,36 @@ int main(int argc, char** argv) {
     cv.fonts = loadFonts(fontsDir, outDir / "fonts");
     std::printf("fonts: %zu file(s) from %s\n", cv.fonts.size(),
                 fontsDir.empty() ? "(none)" : fontsDir.string().c_str());
+
+    // Prefab pre-pass: find repeated components, emit their PackedScenes, then
+    // the frame loop instances them.
+    if (prefabs) {
+        for (Node* frame : frames) {
+            if (!onlyFrame.empty() && frame->name != onlyFrame) continue;
+            cv.scanComponents(frame);
+        }
+        std::set<std::string> usedNames;
+        int compCount = 0;
+        for (auto& kv : cv.compBySig) {
+            Converter::Comp& comp = kv.second;
+            if (comp.count < 2 || !comp.canon) continue;
+            std::string base;
+            for (char c : sanitizeName(comp.name, "Comp"))
+                base.push_back((std::isalnum((unsigned char)c) || c == '-' || c == '_') ? c : '_');
+            if (base.empty()) base = "Comp";
+            std::string uniq = base;
+            int k = 2;
+            while (usedNames.count(uniq)) uniq = base + "_" + std::to_string(k++);
+            usedNames.insert(uniq);
+            comp.name = uniq;
+            comp.extracted = true;
+            ++compCount;
+        }
+        cv.prefabs = true;
+        for (auto& kv : cv.compBySig)
+            if (kv.second.extracted) cv.emitComponentScene(kv.second);
+        std::printf("prefabs: %d component(s)\n", compCount);
+    }
 
     int n = 0;
     uint32_t baseW = 0, baseH = 0;

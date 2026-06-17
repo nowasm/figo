@@ -33,6 +33,10 @@ node html2godot.js <url|file.html> --out <godotDir> \
 `<godotDir>/` becomes an openable Godot 4 project: one `.tscn` per screen,
 deduped sprites, bundled fonts, `manifest.json`, `project.godot`.
 
+Add `--prefabs` to extract repeated components (cards, buttons, rows) into
+reusable `components/*.tscn` (PackedScenes) and instance them per screen with
+per-instance text overrides — real prefab reuse, not just inlined copies.
+
 ## Just the canvas.json
 
 ```
