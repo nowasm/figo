@@ -420,12 +420,21 @@ struct Converter {
             // component slot still aligns; size becomes a per-instance override).
             s += struct_ ? "T" : ("T" + std::to_string((int)(n.textStyle.fontSize + 0.5f)) + n.textStyle.fontFamily);
         } else {
-            // struct_ = pure shape: drop size, solid-color VALUES, and image refs
-            // (all become per-instance overrides) so every instance of a source
-            // component collapses to ONE prefab. Keep fill PRESENCE + kind and
-            // stroke/corner/effect flags so genuinely different shapes stay apart.
+            // struct_ = pure shape: drop solid-color VALUES and image refs (those
+            // become per-instance overrides) so instances differing only in
+            // sprite/text collapse to ONE prefab. Size is dropped for plain/
+            // transparent boxes (a text-width-driven reflow is reproduced by the
+            // child offset overrides), but KEPT (coarsely) for a RASTER node: its
+            // sprite IS its size, and a different-size raster (a 3-seg "玩家人数"
+            // 6/8/10 track vs a wider "画质" 流畅/均衡/极致 track in the same
+            // SettingRow slot) can't be stretched into the canon's box without
+            // overflow — such instances must stay separate variants.
+            bool hasImg = false;
+            for (const auto& p : n.fills) if (p.visible && p.type == figmalib::PaintType::Image) { hasImg = true; break; }
             if (!struct_) s += "#" + std::to_string((int)std::lround(n.width)) + "x" +
                                std::to_string((int)std::lround(n.height));
+            else if (hasImg) s += "#" + std::to_string((int)std::lround(n.width) / 16) + "x" +
+                                  std::to_string((int)std::lround(n.height) / 16);
             for (const auto& p : n.fills) {
                 if (!p.visible) continue;
                 if (p.type == figmalib::PaintType::Solid) {
