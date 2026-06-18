@@ -447,7 +447,10 @@ function collectorFn({ rootSelector, aiName }) {
         const y1 = Math.min(window.innerHeight, out.rect.y + oy + out.rect.h + gm);
         out.glowClip = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
         out.rect = { x: x0 - ox, y: y0 - oy, w: x1 - x0, h: y1 - y0 };
-        out.effect = null;  // baked into the expanded sprite now
+        // KEEP out.effect: it's baked into the expanded sprite (fapp2godot never
+        // re-draws shadows), but the flag must stay so the node is NOT 9-sliced —
+        // a glow panel'd middle would stretch into the glow margin and balloon
+        // the panel (button_47 grew once the effect was cleared and it sliced).
       }
     }
     return out;
