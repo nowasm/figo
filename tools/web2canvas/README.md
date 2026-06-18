@@ -1,7 +1,7 @@
-# web2canvas — React/HTML → figmalib canvas.json → Godot
+# web2canvas — React/HTML → figo canvas.json → Godot
 
-Turn a rendered React/HTML page into a figmalib `canvas.json`, and (with
-`fapp2godot`) into an openable Godot 4 project. The page is rendered in a real
+Turn a rendered React/HTML page into a figo `canvas.json`, and (with
+`figo2godot`) into an openable Godot 4 project. The page is rendered in a real
 headless browser, so computed CSS — flex/grid layout, `oklch` colors,
 `clip-path` cut-corners, gradients, fonts — is captured accurately. Anything a
 flat fill can't express (gradients, images, inline `<svg>`, clip-path, rotated
@@ -9,7 +9,7 @@ elements, dashed borders, glows) is rasterized to a PNG `IMAGE` fill, matching
 the project's vector→texture goal.
 
 ```
-React/HTML ──web2canvas──► canvas.json + images/ ──fapp2godot──► Godot .tscn + sprites
+React/HTML ──web2canvas──► canvas.json + images/ ──figo2godot──► Godot .tscn + sprites
 ```
 
 ## Install
@@ -19,7 +19,7 @@ cd tools/web2canvas
 npm install         # playwright-core + vendored react/react-dom/@babel/standalone
 ```
 
-Drives the **installed Edge/Chrome** (no Chromium download). Needs `fapp2godot`
+Drives the **installed Edge/Chrome** (no Chromium download). Needs `figo2godot`
 built (see repo root; the core-only `build_godot` target is enough).
 
 ## One command: html → Godot project
@@ -27,7 +27,7 @@ built (see repo root; the core-only `build_godot` target is enough).
 ```
 node html2godot.js <url|file.html> --out <godotDir> \
      [--states "a,b,c"] [--fonts DIR] [--root SEL] [--viewport WxH] \
-     [--wait MS] [--browser msedge|chrome] [--prefabs] [--ai-name] [--fapp2godot <exe>]
+     [--wait MS] [--browser msedge|chrome] [--prefabs] [--ai-name] [--figo2godot <exe>]
 ```
 
 `<godotDir>/` becomes an openable Godot 4 project: one `.tscn` per screen,

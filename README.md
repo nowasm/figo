@@ -1,4 +1,4 @@
-# figmalib
+# figo
 
 A C++ vector-UI library that renders **Figma designs (and React/HTML pages)
 directly as game UI** inside a game engine.
@@ -18,16 +18,16 @@ Every input is normalized to a single intermediate representation,
 input                                  IR                    output
 .fig file ──fig2json──────────┐
 Figma REST JSON (?geometry=paths) ─┤
-React/HTML ──web2canvas───────┤── canvas.json ─▶ figmalib::Document ─┬─▶ ThorVG raster ─▶ engine texture
+React/HTML ──web2canvas───────┤── canvas.json ─▶ figo::Document ─┬─▶ ThorVG raster ─▶ engine texture
        (captured after real-browser render) │  (format auto-detected) (Frame/Text/…) │   (raylib / Unity / custom runtime…)
-                                                                      └─▶ fapp2godot ─▶ Godot 4 project
+                                                                      └─▶ figo2godot ─▶ Godot 4 project
                                                                               (.tscn + PNG sprites)
 ```
 
 Runtime path (ThorVG):
 
 ```
-node tree  figmalib::Document (Frame / Rect / Ellipse / Vector / Text / ...)
+node tree  figo::Document (Frame / Rect / Ellipse / Vector / Text / ...)
         │  scene_builder
         ▼
 ThorVG scene graph ──SwCanvas──▶ RGBA8888 pixel buffer (straight alpha)
@@ -39,12 +39,12 @@ ThorVG scene graph ──SwCanvas──▶ RGBA8888 pixel buffer (straight alpha
 ## Directory layout
 
 ```
-include/figmalib/   public API (document / parser / renderer / ui / script)
+include/figo/   public API (document / parser / renderer / ui / script)
 src/                parser, SVG path parsing, ThorVG scene building, fonts, renderer, script host
 backends/raylib/    raylib backend (reference template for other engine backends, ~200 lines)
 apps/editor/        figmaedit — a Figma-style visual editor (raylib + raygui + MCP)
 apps/figmaplay/     figmaplay — a generic script player (app = .fig + .js, hot-reload)
-apps/fapp2godot/    fapp2godot — canvas.json → a Godot 4 project (.tscn + sprites)
+apps/figo2godot/    figo2godot — canvas.json → a Godot 4 project (.tscn + sprites)
 examples/           demo_raylib / demo_wallet demos, example scripts and design files
   assets/           Figma JSON and .fig used for tests/demos
   scripts/          figmaplay example scripts (wallet.js)
@@ -76,7 +76,7 @@ Interactions mirror Figma:
 A layer tree on the left (expand / toggle visibility / click to select), an
 inspector on the right (X/Y/W/H, opacity, corner radius, fill color, text
 content), and a toolbar on top (tools, page switch, zoom level). Saving writes
-`<original>.figmalib.json` (REST format, directly re-loadable by figmalib, never
+`<original>.figo.json` (REST format, directly re-loadable by figo, never
 overwriting the original .fig). HiDPI scaling is auto-detected and overridable
 via the `FIGMAEDIT_SCALE` environment variable.
 
@@ -131,7 +131,7 @@ headless regression over the full MCP toolset.
    (the zero-copy GPU path); drop `,gl` for CPU-only rendering (GPU calls fall
    back automatically).
 
-2. Build figmalib (raylib is fetched automatically via CMake FetchContent):
+2. Build figo (raylib is fetched automatically via CMake FetchContent):
 
    ```
    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -153,16 +153,16 @@ The ThorVG paths can be overridden with
 ## Usage
 
 ```cpp
-#include <figmalib/figmalib.h>
-#include <figmalib_raylib.h>
+#include <figo/figo.h>
+#include <figo_raylib.h>
 
-auto ui = figmalib::FigmaUI::fromFile("menu.json");   // Figma REST JSON
-ui->onClick("btn-start", [&](figmalib::Node&) { startGame(); });
-ui->onHover("btn-start", [&](figmalib::Node& n, bool in) {
+auto ui = figo::FigmaUI::fromFile("menu.json");   // Figma REST JSON
+ui->onClick("btn-start", [&](figo::Node&) { startGame(); });
+ui->onHover("btn-start", [&](figo::Node& n, bool in) {
     ui->setOpacity(n.name, in ? 0.8f : -1.0f);
 });
 
-figmalib::RaylibFigmaView view(*ui);
+figo::RaylibFigmaView view(*ui);
 while (!WindowShouldClose()) {
     view.resize(GetScreenWidth(), GetScreenHeight());
     view.update();                       // input + dirty-region redraw + texture upload
@@ -176,7 +176,7 @@ while (!WindowShouldClose()) {
 ### Scripting layer (QuickJS)
 
 You can build an app without writing C++: **the design is a .fig, the logic is
-a .js**. `figmalib_script` binds the FigmaUI API into QuickJS (quickjs-ng,
+a .js**. `figo_script` binds the FigmaUI API into QuickJS (quickjs-ng,
 fetched by CMake), and `figmaplay` is the generic player:
 
 ```
@@ -184,7 +184,7 @@ figmaplay wallet.fig wallet.js
 ```
 
 ```js
-// wallet.js — full API in include/figmalib/script.h
+// wallet.js — full API in include/figo/script.h
 ui.setResizeMode("reflow");
 ui.selectFrame("Home");
 ui.bindList("portfolio-list", coins.length, (item, i) => {
@@ -222,7 +222,7 @@ figmaplay examples/apps/sample            # reads sample/app.json
   "entryFrame": "MainMenu",      // frame selected at startup (the script can still navigate)
   "fonts": "fonts",              // optional; for platforms without system fonts
   "designSystem": "linear-app",  // optional; points at aesthetic tokens under design-systems/
-  "package": { "id": "com.figmalib.sample", "version": "1.0.0" }  // reserved for packaging
+  "package": { "id": "com.figo.sample", "version": "1.0.0" }  // reserved for packaging
 }
 ```
 
@@ -264,17 +264,17 @@ corresponding .ttf into the app's `fonts/` directory.
 In Figma, File → Save local copy... to save a `.fig`, then directly:
 
 ```cpp
-auto ui = figmalib::FigmaUI::fromFile("design.fig");
+auto ui = figo::FigmaUI::fromFile("design.fig");
 ```
 
-figmalib does the .fig→JSON conversion **in-process**
+figo does the .fig→JSON conversion **in-process**
 ([fig2json](https://github.com/kreako/fig2json) compiled to a static library and
-linked directly; CMake `FIGMALIB_FIG2JSON_LIB` points at the .lib produced by
+linked directly; CMake `FIGO_FIG2JSON_LIB` points at the .lib produced by
 `cargo build --release`), with no external process dependency; the result is
 cached in `design.fig.export/` (reused when the .fig is unchanged), and images
 are decoded from the .fig's embedded data and fed to the renderer automatically.
 When the static lib is absent it falls back to invoking the fig2json CLI (lookup
-order: `FIGMALIB_FIG2JSON` env var → CMake `FIGMALIB_FIG2JSON` default path →
+order: `FIGO_FIG2JSON` env var → CMake `FIGO_FIG2JSON` default path →
 PATH). You can also pre-convert manually (`fig2json design.fig outdir`) and load
 `outdir/canvas.json` directly.
 
@@ -319,7 +319,7 @@ downloaded separately (`/v1/images`) into the directory given to
   coverage queries — CJK/symbols inside a Latin font are rendered with a system
   fallback font such as YaHei/SimHei)
 - Font convention: a `fonts/` directory next to the input file and the
-  `FIGMALIB_FONTS_DIR` env var are auto-registered
+  `FIGO_FONTS_DIR` env var are auto-registered
 - Runtime: frame switching, hit-testing, hover/click callbacks, dynamic
   visibility/opacity/text changes
 - **Component variant switching**: `ui->setVariant("btn-start", "State", "Hover")`
@@ -336,20 +336,20 @@ downloaded separately (`/v1/images`) into the directory given to
   frames reflow to the viewport instead of scaling uniformly:
 
   ```cpp
-  ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Reflow);  // default is Scale
+  ui->setResizeMode(figo::FigmaUI::ResizeMode::Reflow);  // default is Scale
   ui->setViewport(w, h);   // triggers layoutFrame() reflow (toggle with R in the demo)
   ```
 
   Reflow is based on the original geometry snapshotted at parse time
   (`Node::base*`), so repeated resizing never accumulates error; the layout
-  engine is also usable standalone: `figmalib::layoutFrame(frame, w, h)`. Vector
+  engine is also usable standalone: `figo::layoutFrame(frame, w, h)`. Vector
   path geometry scales with node size, and rounded rects/ellipses are
   regenerated at the new size (corners don't distort). Note: the .fig path needs
   this repo's patched fig2json (the upstream version strips
   constraints/stack fields); stale caches re-convert automatically when fig2json
   updates. `layout_test.exe` is the headless self-test for the layout math.
 
-## React/HTML → Godot project (web2canvas + fapp2godot)
+## React/HTML → Godot project (web2canvas + figo2godot)
 
 Beyond Figma, **a React/HTML page can be turned directly into a Godot 4
 project**. The page is rendered in a real headless browser and then captured, so
@@ -361,7 +361,7 @@ fill, in line with the "vector → texture" goal. The whole chain is validated
 end-to-end on a real page (the GOGO KILL HUD, 8 screens).
 
 ```
-React/HTML ──web2canvas──▶ canvas.json + images/ ──fapp2godot──▶ Godot .tscn + sprites
+React/HTML ──web2canvas──▶ canvas.json + images/ ──figo2godot──▶ Godot .tscn + sprites
 ```
 
 ### web2canvas (`tools/web2canvas/`, Node)
@@ -386,7 +386,7 @@ node index.js <url|file.html> [-o out.canvas.json] [--root SEL] [--viewport WxH]
 | `--nav-fn FN` | the global nav function name (default `__nav`) |
 | `--fonts DIR` | inject the project's `fonts.css` so text is measured at real widths |
 
-### fapp2godot (`apps/fapp2godot/`, C++)
+### figo2godot (`apps/figo2godot/`, C++)
 
 Converts a canvas.json into a Godot 4 project: each top-level frame → one
 `.tscn`, with deduplicated PNG sprites (content-hash dedup), bound fonts, a
@@ -394,12 +394,12 @@ Converts a canvas.json into a Godot 4 project: each top-level frame → one
 rect/container→ColorRect, rounded panel→NinePatchRect+sprite,
 ellipse/vector/gradient/image/stroke/effect→TextureRect+baked sprite (sprites
 are rendered by `Renderer::renderOverlay`, pixel-identical to the runtime).
-Responsive constraints → Godot anchor/offset. The tool links only the figmalib
+Responsive constraints → Godot anchor/offset. The tool links only the figo
 core static library (no raylib/quickjs needed), so it builds in seconds in a
 minimal `build_godot` directory.
 
 ```
-fapp2godot <input.canvas.json|.fig|REST.json> [outDir] [--fonts DIR] [--prefabs] [--scale N]
+figo2godot <input.canvas.json|.fig|REST.json> [outDir] [--fonts DIR] [--prefabs] [--scale N]
 ```
 
 `--prefabs`: extract repeated components (cards/buttons/rows) into
@@ -413,7 +413,7 @@ node tools/web2canvas/html2godot.js <url|file.html> --out <godotDir> \
      [--states "a,b,c"] [--fonts DIR] [--root SEL] [--viewport WxH] [--wait MS] [--prefabs]
 ```
 
-Runs web2canvas → fapp2godot, with intermediate artifacts in
+Runs web2canvas → figo2godot, with intermediate artifacts in
 `<godotDir>/.web2canvas/`; `<godotDir>/` opens directly in Godot 4. Full example
 (GOGO KILL HUD, 8 screens → 8 scenes):
 
@@ -508,7 +508,7 @@ packaging by hand:
 tools\build_thorvg_android.cmd      # ThorVG arm64-v8a + x86_64 static libs
 powershell tools\build_android.ps1  # NDK dual-ABI compile → build_android\figmaplay.apk
 adb install -r build_android\figmaplay.apk
-adb shell am start -n com.figmalib.play/android.app.NativeActivity
+adb shell am start -n com.figo.play/android.app.NativeActivity
 ```
 
 SDK/NDK come from `D:\devlib\android\sdk` (NDK 27.2, API 28+). Assets inside the
@@ -524,7 +524,7 @@ An engine backend can let ThorVG's GL engine render straight into its own FBO
 
 ```cpp
 // CPU (default): ui->setViewport(w, h) + ui->pixels() to upload a texture
-// GPU: under the current GL context, hand the FBO id to figmalib
+// GPU: under the current GL context, hand the FBO id to figo
 if (!ui->setViewportGL(fboId, w, h)) ui->setViewport(w, h);  // fall back when there's no GL engine
 ui->render();  // draws straight into the FBO, no pixels() readback
 ```

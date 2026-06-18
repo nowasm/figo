@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace figmalib {
+namespace figo {
 
 namespace {
 
@@ -257,4 +257,4 @@ bool appendSvgPath(tvg::Shape& shape, const char* d, float sx, float sy) {
     return any;
 }
 
-}  // namespace figmalib
+}  // namespace figo

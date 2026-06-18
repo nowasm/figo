@@ -1,12 +1,12 @@
 #pragma once
-// figmalib — trackpad pinch-zoom gesture source.
+// figo — trackpad pinch-zoom gesture source.
 //
 // macOS delivers two-finger pinch as NSEventMaskMagnify events, which GLFW
 // (and therefore raylib) does not surface. This tiny shim installs a Cocoa
 // event monitor and accumulates the magnification so the raylib backend can
 // drive zoom. No-op on every other platform (the backend provides the stub).
 
-namespace figmalib {
+namespace figo {
 
 // Install the magnify monitor once. Safe to call every frame (idempotent).
 // Must be called after the window/NSApp exists. No-op off macOS.
@@ -17,4 +17,4 @@ void pinchGestureInstall();
 // Resets to 0 on read. Returns 0 off macOS.
 float pinchGestureConsume();
 
-}  // namespace figmalib
+}  // namespace figo

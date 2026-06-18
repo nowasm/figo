@@ -1,28 +1,37 @@
-# figmalib — AI 工作指南
+# figo — AI 工作指南
 
 把 Figma 文件当作 UI 运行时：**一个 app = 设计(.fig) + 逻辑(.js)**。
 C++ 库（解析 → 布局 → ThorVG 光栅化 → raylib 上屏）+ QuickJS 脚本层。
 
 ## 构建与测试
 
-构建目录是 `build/`（CMake + Ninja + MSVC /MD）。**必须先加载 VS 环境**，
-PowerShell 里用临时 cmd 脚本包一层：
+构建目录是 `build/`（CMake + Ninja）。CMake 工程名与静态库目标统一为 **figo**
+（`libfigo.a` / `libfigo_script.a` / `libfigo_raylib.a`；Godot 导出工具 `figo2godot`）。
+
+**macOS**（实测可用，clang++ + Ninja）——首次 configure 后增量编译只需在 `build/` 下：
+
+```bash
+cd build && cmake . && cmake --build . -j
+```
+
+**Windows**（MSVC /MD）**必须先加载 VS 环境**，PowerShell 里用临时 cmd 脚本包一层：
 
 ```powershell
 $bat = 'call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1' + "`r`n" +
-       'cd /d D:\work_open\figmalib\build' + "`r`n" + 'cmake --build . --config Release -j'
-Set-Content build\bw.cmd $bat -Encoding ascii; cmd /c "D:\work_open\figmalib\build\bw.cmd"; Remove-Item build\bw.cmd
+       'cd /d <repo>\build' + "`r`n" + 'cmake --build . --config Release -j'
+Set-Content build\bw.cmd $bat -Encoding ascii; cmd /c "<repo>\build\bw.cmd"; Remove-Item build\bw.cmd
 ```
 
-验证（都在 `build/` 下运行）：
+验证（都在 `build/` 下运行；Windows 加 `.exe` 后缀）：
 
-- `render_test.exe` — 离屏渲染自检，必须 `RESULT: OK`
-- `layout_test.exe` — 布局数学自测
-- `demo_wallet.exe --selfdrive sd` — 全功能巡演（滚动/惯性/选区/转场/固定 tab 栏），
+- `render_test` — 离屏渲染自检，应 `RESULT: OK`
+  （注：缺系统字体时 `auto-height text did not grow` 会单点失败，属环境问题非回归）
+- `layout_test` — 布局数学自测
+- `demo_wallet --selfdrive sd` — 全功能巡演（滚动/惯性/选区/转场/固定 tab 栏），
   产出 `sd_*.png` 截图用 Read 工具目检
-- `figmaplay.exe <fig> <js> --shot out.png [--frames N]` — 渲 N 帧截图退出
+- `figmaplay <fig> <js> --shot out.png [--frames N]` — 渲 N 帧截图退出
 
-链接失败 LNK1104 = exe 正在运行，先 `Stop-Process`。临时截图用完即删。
+链接失败（Windows LNK1104 / macOS 占用）= exe 正在运行，先结束进程。临时截图用完即删。
 
 ## AI 开发 app 的闭环
 
@@ -34,7 +43,7 @@ Set-Content build\bw.cmd $bat -Encoding ascii; cmd /c "D:\work_open\figmalib\bui
 1. **设计**：启动 `build\figmaedit.exe <file.fig>`，仓库根 `.mcp.json` 已配置
    figmaedit 的 MCP（127.0.0.1:9223），用它的 15 个工具直接读改设计
    （get_node_tree / create_node / update_nodes / get_screenshot / save_document…）。
-2. **逻辑**：写 `app.js`。完整 JS API 见 `include/figmalib/script.h` 头部注释。速查：
+2. **逻辑**：写 `app.js`。完整 JS API 见 `include/figo/script.h` 头部注释。速查：
    - `ui.onClick/onHover/onUpdate`、`ui.navigateTo(name, "slideLeft", 0.3)` / `navigateBack`
    - `ui.bindList(name, count, (item, i) => …)`，节点：`.find/.child/.parent/.index/.text/.type`
    - `ui.setText/setVisible/setOpacity/setVariant/setScroll/setEditable/focusText`

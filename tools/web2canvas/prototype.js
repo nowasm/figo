@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// prototype.js — turn a fapp2godot-exported project (one .tscn per captured UI
+// prototype.js — turn a figo2godot-exported project (one .tscn per captured UI
 // state) into a clickable interaction prototype. Given a nav graph (scene ->
 // [{text|auto, to}]) derived from the source app's logic, it:
 //   - writes NavData.gd (the graph) + Screen.gd (the wiring) into the project,

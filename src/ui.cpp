@@ -1,4 +1,4 @@
-#include "figmalib/ui.h"
+#include "figo/ui.h"
 
 #include <algorithm>
 #include <cctype>
@@ -8,10 +8,10 @@
 #include <map>
 #include <unordered_map>
 
-#include "figmalib/layout.h"
-#include "figmalib/parser.h"
+#include "figo/layout.h"
+#include "figo/parser.h"
 
-namespace figmalib {
+namespace figo {
 
 struct FigmaUI::Impl {
     std::unique_ptr<Document> doc;
@@ -550,7 +550,7 @@ std::unique_ptr<FigmaUI> FigmaUI::fromFile(const std::string& path) {
         ui->impl_->renderer.setImageDirectory(loaded.imageDirectory);
     }
     // Conventions for design fonts: a "fonts" directory next to the input
-    // file, plus the FIGMALIB_FONTS_DIR environment variable.
+    // file, plus the FIGO_FONTS_DIR environment variable.
     {
         namespace fs = std::filesystem;
         std::error_code ec;
@@ -558,7 +558,7 @@ std::unique_ptr<FigmaUI> FigmaUI::fromFile(const std::string& path) {
         if (fs::is_directory(sibling, ec)) {
             ui->impl_->renderer.registerFontsFromDirectory(sibling.string());
         }
-        if (const char* env = std::getenv("FIGMALIB_FONTS_DIR"); env && *env) {
+        if (const char* env = std::getenv("FIGO_FONTS_DIR"); env && *env) {
             if (fs::is_directory(env, ec)) {
                 ui->impl_->renderer.registerFontsFromDirectory(env);
             }
@@ -1194,4 +1194,4 @@ bool FigmaUI::setVariant(const std::string& instanceName, const std::string& pro
     return true;
 }
 
-}  // namespace figmalib
+}  // namespace figo

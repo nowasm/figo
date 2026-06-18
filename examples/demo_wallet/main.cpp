@@ -1,4 +1,4 @@
-// demo_wallet: a real "native app" built from wallet.fig with figmalib.
+// demo_wallet: a real "native app" built from wallet.fig with figo.
 //
 // Everything on screen is the Figma design; this file only supplies data and
 // behavior — exactly the split the library is meant to enable:
@@ -17,8 +17,8 @@
 
 #include <raylib.h>
 
-#include <figmalib/figmalib.h>
-#include <figmalib_raylib.h>
+#include <figo/figo.h>
+#include <figo_raylib.h>
 
 namespace {
 
@@ -41,11 +41,11 @@ const std::vector<Coin> kPortfolio = {
 };
 
 // First TEXT node in a subtree (template stamping helper).
-figmalib::Node* firstText(figmalib::Node* root) {
-    figmalib::Node* found = nullptr;
+figo::Node* firstText(figo::Node* root) {
+    figo::Node* found = nullptr;
     if (root) {
-        root->visit([&](figmalib::Node& n) {
-            if (!found && n.type == figmalib::NodeType::Text) found = &n;
+        root->visit([&](figo::Node& n) {
+            if (!found && n.type == figo::NodeType::Text) found = &n;
             return !found;
         });
     }
@@ -83,14 +83,14 @@ int main(int argc, char** argv) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(420, 900, "wallet — a Figma file running as an app");
 
-    auto ui = figmalib::FigmaUI::fromFile(input);
-    ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Reflow);
+    auto ui = figo::FigmaUI::fromFile(input);
+    ui->setResizeMode(figo::FigmaUI::ResizeMode::Reflow);
     ui->selectFrame("Home");
 
     // wallet.fig quirk: Discover/Marketplace/Profile author their "Bottom Nav
     // Bar" as fixed-when-scrolling, but the Home screens forgot to — pin them
     // all so the navigation never scrolls away with the content.
-    ui->document().root->visit([](figmalib::Node& n) {
+    ui->document().root->visit([](figo::Node& n) {
         if (n.name == "Bottom Nav Bar") n.scrollFixed = true;
         return true;
     });
@@ -102,22 +102,22 @@ int main(int argc, char** argv) {
         if (auto* list = pf->findByName("List")) list->name = "portfolio-list";
         // The design sized this section for 4 rows (fixed height, centered);
         // with live data the section should grow downward instead.
-        pf->autoLayout.primarySizing = figmalib::AutoLayout::Sizing::Hug;
-        pf->autoLayout.primaryAlign = figmalib::AutoLayout::Align::Min;
+        pf->autoLayout.primarySizing = figo::AutoLayout::Sizing::Hug;
+        pf->autoLayout.primaryAlign = figo::AutoLayout::Align::Min;
     }
     auto bindPortfolio = [&]() {
         ui->bindList("portfolio-list", kPortfolio.size(),
-                     [](figmalib::Node& item, size_t i) {
+                     [](figo::Node& item, size_t i) {
             const Coin& c = kPortfolio[i];
             auto* heading = item.findByName("Heading");
             if (heading && heading->children.size() >= 2) {
-                figmalib::setNodeText(*heading->children[0], c.symbol);
-                figmalib::setNodeText(*heading->children[1], c.change);
+                figo::setNodeText(*heading->children[0], c.symbol);
+                figo::setNodeText(*heading->children[1], c.change);
             }
             auto* balance = item.findByName("Balance");
             if (balance && balance->children.size() >= 2) {
-                figmalib::setNodeText(*balance->children[0], c.usd);
-                figmalib::setNodeText(*balance->children[1], c.amount);
+                figo::setNodeText(*balance->children[0], c.usd);
+                figo::setNodeText(*balance->children[1], c.amount);
             }
         });
     };
@@ -125,21 +125,21 @@ int main(int argc, char** argv) {
 
     // ---- behavior: tap a coin row → Coin Info ----
     auto openCoin = [&](const Coin& c) {
-        ui->navigateTo("Coin Info", figmalib::FigmaUI::Transition::SlideLeft, 0.28f);
+        ui->navigateTo("Coin Info", figo::FigmaUI::Transition::SlideLeft, 0.28f);
         // Stamp the detail screen for the tapped coin.
         if (auto* conv = ui->currentFrame()->findByName("Conversion Value")) {
             if (auto* unit = firstText(conv)) {
-                figmalib::setNodeText(*unit, std::string("1 ") + c.symbol);
+                figo::setNodeText(*unit, std::string("1 ") + c.symbol);
             }
-            figmalib::Node* price = nullptr;  // the price is the last text child
+            figo::Node* price = nullptr;  // the price is the last text child
             for (auto& child : conv->children) {
-                if (child->type == figmalib::NodeType::Text) price = child.get();
+                if (child->type == figo::NodeType::Text) price = child.get();
             }
-            if (price) figmalib::setNodeText(*price, c.rate);
+            if (price) figo::setNodeText(*price, c.rate);
             ui->markDirty();
         }
     };
-    ui->onClick("Card", [&](figmalib::Node& n) {
+    ui->onClick("Card", [&](figo::Node& n) {
         if (!n.parent || n.parent->name != "portfolio-list") return;  // hero card etc.
         size_t idx = 0;
         for (size_t i = 0; i < n.parent->children.size(); ++i) {
@@ -149,22 +149,22 @@ int main(int argc, char** argv) {
     });
 
     // ---- behavior: bottom navigation ----
-    ui->onClick("Discover", [&](figmalib::Node&) {
+    ui->onClick("Discover", [&](figo::Node&) {
         std::printf("[nav] Discover clicked\n");
         ui->navigateTo("Discover");
     });
-    ui->onClick("Trade", [&](figmalib::Node&) {
+    ui->onClick("Trade", [&](figo::Node&) {
         std::printf("[nav] Trade clicked\n");
         ui->navigateTo("Marketplace");
     });
-    ui->onClick("Account", [&](figmalib::Node&) {
+    ui->onClick("Account", [&](figo::Node&) {
         std::printf("[nav] Account clicked\n");
         ui->navigateTo("Profile");
     });
-    ui->onClick("Wallet", [&](figmalib::Node&) {  // center button = home
+    ui->onClick("Wallet", [&](figo::Node&) {  // center button = home
         std::printf("[nav] Wallet clicked\n");
         while (ui->canGoBack()) ui->navigateBack(0.0f);
-        ui->navigateTo("Home", figmalib::FigmaUI::Transition::Dissolve, 0.2f);
+        ui->navigateTo("Home", figo::FigmaUI::Transition::Dissolve, 0.2f);
     });
 
     // ---- behavior: the greeting is a text field ----
@@ -175,11 +175,11 @@ int main(int argc, char** argv) {
         }
     }
 
-    figmalib::RaylibFigmaView view(*ui);
+    figo::RaylibFigmaView view(*ui);
     int frame = 0;
     bool quit = false;
 
-    figmalib::Node* lastFrameNode = ui->currentFrame();
+    figo::Node* lastFrameNode = ui->currentFrame();
     bool tabShotDone = false;
     while (!WindowShouldClose() && !quit) {
         if (ui->currentFrame() != lastFrameNode) {
@@ -256,7 +256,7 @@ int main(int argc, char** argv) {
             } else if (frame == 112) {
                 shot("select");
             } else if (frame == 116) {
-                ui->editKey(figmalib::FigmaUI::EditKey::Left);  // collapse to start
+                ui->editKey(figo::FigmaUI::EditKey::Left);  // collapse to start
                 if (auto* g = ui->document().findByName("greeting")) {
                     std::printf("after Left: anchor=%d caret=%d\n", g->selAnchorByte,
                                 g->caretByte);
@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
                 // Hit-test sanity after pure-scroll updates (no scene
                 // rebuild): the node under the viewport center must match the
                 // scrolled layout, not the pre-scroll one.
-                figmalib::Node* hit =
+                figo::Node* hit =
                     ui->hitTest(GetScreenWidth() * 0.5f, GetScreenHeight() * 0.5f);
                 std::printf("post-scroll hit at center: %s (scrollY=%.1f)\n",
                             hit ? hit->name.c_str() : "(none)",
@@ -314,7 +314,7 @@ int main(int argc, char** argv) {
                 SetWindowSize(420, 900);
             } else if (frame == 240) {
                 // Reproduce the nav-bounce report: click the Discover nav item.
-                figmalib::Node* item = nullptr;
+                figo::Node* item = nullptr;
                 if (auto* nav = ui->currentFrame()->findByName("Navigation Bar")) {
                     item = nav->findByName("Discover");
                 }
@@ -344,7 +344,7 @@ int main(int argc, char** argv) {
                 shot("tabswap");
             } else if (frame == 280) {
                 // The reported bounce: on the Discover page, tap Trade.
-                figmalib::Node* item = nullptr;
+                figo::Node* item = nullptr;
                 if (auto* nav = ui->currentFrame()->findByName("Navigation Bar")) {
                     item = nav->findByName("Trade");
                 }

@@ -1,4 +1,4 @@
-#include "figmalib/script.h"
+#include "figo/script.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -28,10 +28,10 @@
 
 #include <nlohmann/json.hpp>
 
-#include "figmalib/document.h"
-#include "figmalib/ui.h"
+#include "figo/document.h"
+#include "figo/ui.h"
 
-namespace figmalib {
+namespace figo {
 
 namespace {
 
@@ -133,7 +133,7 @@ void fetchWorker(std::shared_ptr<FetchQueue> queue, uint64_t id, std::string url
     uc.dwUrlPathLength = 2047;
     if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &uc)) return fail("bad url");
 
-    ses = WinHttpOpen(L"figmalib/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+    ses = WinHttpOpen(L"figo/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                       WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!ses) return fail("WinHttpOpen");
     con = WinHttpConnect(ses, host, uc.nPort, 0);
@@ -1089,4 +1089,4 @@ void ScriptHost::update(float dtSeconds) {
     }
 }
 
-}  // namespace figmalib
+}  // namespace figo

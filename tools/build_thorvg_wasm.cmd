@@ -1,6 +1,6 @@
 @echo off
 rem Builds ThorVG (software engine, no threads) for wasm32 into
-rem ..\thorvg\build_wasm — consumed by the figmalib web build.
+rem ..\thorvg\build_wasm — consumed by the figo web build.
 setlocal
 if "%EMSDK_HOME%"=="" set EMSDK_HOME=D:\devlib\emsdk
 call %EMSDK_HOME%\emsdk_env.bat >nul 2>&1

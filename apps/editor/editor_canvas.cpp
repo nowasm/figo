@@ -1,5 +1,5 @@
 ﻿// Canvas interaction + rendering: Figma-faithful navigation, selection and
-// transform gestures, with the page rasterized by figmalib/ThorVG and
+// transform gestures, with the page rasterized by figo/ThorVG and
 // overlays (hover, selection, handles, marquee) drawn by raylib on top.
 
 #include <cmath>
@@ -275,10 +275,10 @@ void updateCanvas(EditorState& ed) {
     // magnification, which is a no-op on every other platform.
     static bool pinchInstalled = false;
     if (!pinchInstalled) {
-        figmalib::pinchGestureInstall();
+        figo::pinchGestureInstall();
         pinchInstalled = true;
     }
-    const float magnify = figmalib::pinchGestureConsume();
+    const float magnify = figo::pinchGestureConsume();
     if (magnify != 0 && inViewport) {
         ed.cam.zoomAt(mx, my, 1.0f + magnify);
         ed.lastViewChange = GetTime();
@@ -513,7 +513,7 @@ void drawCanvas(EditorState& ed) {
 
         if (wantRaster && (contentStale || GetTime() < budgetEnd)) {
             if (!entry.renderer) {
-                entry.renderer = std::make_unique<figmalib::Renderer>();
+                entry.renderer = std::make_unique<figo::Renderer>();
                 for (const auto& dir : ed.fontDirs)
                     entry.renderer->registerFontsFromDirectory(dir);
                 if (!ed.imageDir.empty()) entry.renderer->setImageDirectory(ed.imageDir);

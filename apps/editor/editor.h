@@ -1,5 +1,5 @@
 #pragma once
-// figmaedit — a Figma-style editor on top of figmalib.
+// figmaedit — a Figma-style editor on top of figo.
 // Interaction semantics intentionally mirror Figma: scope-based selection
 // (click = top-level under cursor, double-click drills in, Ctrl+click deep
 // selects, Esc pops out), space/middle-drag pan, Ctrl+wheel or two-finger
@@ -12,15 +12,15 @@
 #include <unordered_set>
 #include <vector>
 
-#include <figmalib/figmalib.h>
+#include <figo/figo.h>
 
 #include <raylib.h>
 
 namespace figmaedit {
 
-using figmalib::Document;
-using figmalib::Mat23;
-using figmalib::Node;
+using figo::Document;
+using figo::Mat23;
+using figo::Node;
 
 // ---- layout (scaled once at startup for HiDPI) -------------------------------
 extern float gUiScale;
@@ -52,7 +52,7 @@ void applyEditorTheme();
 // contains CJK names). Codepoints are collected per document. ----
 extern Font gUiFont;
 void initUiFont();                                  // ASCII, at startup
-void rebuildUiFontFor(const figmalib::Document& doc);
+void rebuildUiFontFor(const figo::Document& doc);
 void uiText(const char* text, float x, float y, int size, ::Color color);
 float uiMeasure(const char* text, int size);
 
@@ -99,12 +99,12 @@ struct NodeProps {
     float opacity = 1;
     float cornerRadius = 0;
     bool visible = true;
-    std::vector<figmalib::Paint> fills;
-    std::vector<figmalib::Paint> strokes;
+    std::vector<figo::Paint> fills;
+    std::vector<figo::Paint> strokes;
     float strokeWeight = 1;
-    figmalib::StrokeAlign strokeAlign = figmalib::StrokeAlign::Inside;
-    std::vector<figmalib::Effect> effects;
-    figmalib::TextStyle textStyle;
+    figo::StrokeAlign strokeAlign = figo::StrokeAlign::Inside;
+    std::vector<figo::Effect> effects;
+    figo::TextStyle textStyle;
     std::string characters;
     // Fields below are only edited via MCP, but capturing them here keeps
     // every AI edit undoable with the same machinery.
@@ -112,11 +112,11 @@ struct NodeProps {
     bool clipsContent = false;
     std::optional<std::array<float, 4>> rectangleCornerRadii;
     std::vector<float> strokeDashes;
-    std::vector<figmalib::TextRun> textRuns;
-    std::vector<figmalib::PathGeometry> fillGeometry;
-    figmalib::Constraint constraintH = figmalib::Constraint::Min;
-    figmalib::Constraint constraintV = figmalib::Constraint::Min;
-    figmalib::AutoLayout autoLayout;
+    std::vector<figo::TextRun> textRuns;
+    std::vector<figo::PathGeometry> fillGeometry;
+    figo::Constraint constraintH = figo::Constraint::Min;
+    figo::Constraint constraintV = figo::Constraint::Min;
+    figo::AutoLayout autoLayout;
     float layoutGrow = 0;
     bool layoutAlignStretch = false;
     bool layoutAbsolute = false;
@@ -144,10 +144,10 @@ enum class Tool { Move, Hand };
 enum class DragMode { None, Pan, Marquee, MoveNodes, Resize };
 
 struct EditorState {
-    figmalib::LoadedFile file;
+    figo::LoadedFile file;
     std::string filePath;     // original input
     std::string savePath;     // where Ctrl+S writes
-    figmalib::Renderer renderer;
+    figo::Renderer renderer;
 
     Node* page = nullptr;     // current CANVAS
     int pageIndex = 0;
@@ -177,7 +177,7 @@ struct EditorState {
     // GPU; a frame re-rasterizes when its content version changes or the
     // zoom leaves the band it was rendered at.
     struct FrameCacheEntry {
-        std::unique_ptr<figmalib::Renderer> renderer;  // persistent tvg scene
+        std::unique_ptr<figo::Renderer> renderer;  // persistent tvg scene
         Texture2D tex{};
         bool texValid = false;
         float zoom = -1;        // raster zoom of the texture

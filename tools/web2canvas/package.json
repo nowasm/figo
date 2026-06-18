@@ -2,7 +2,7 @@
   "name": "web2canvas",
   "version": "0.1.0",
   "private": true,
-  "description": "Convert a rendered React/HTML page into figmalib canvas.json via a headless browser.",
+  "description": "Convert a rendered React/HTML page into figo canvas.json via a headless browser.",
   "type": "commonjs",
   "bin": {
     "web2canvas": "index.js"

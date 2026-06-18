@@ -110,7 +110,7 @@ void initUiFont() {
     loadUiFont(ascii, false);
 }
 
-void rebuildUiFontFor(const figmalib::Document& doc) {
+void rebuildUiFontFor(const figo::Document& doc) {
     std::unordered_set<int> cps;
     for (int cp = 32; cp < 127; ++cp) cps.insert(cp);
     bool hasCjk = false;
@@ -219,7 +219,7 @@ void EditorState::selectPage(int index) {
     auto& pages = file.document->root->children;
     std::vector<Node*> canvases;
     for (auto& c : pages)
-        if (c->type == figmalib::NodeType::Canvas) canvases.push_back(c.get());
+        if (c->type == figo::NodeType::Canvas) canvases.push_back(c.get());
     if (canvases.empty()) {  // bare tree: treat root as the page
         page = file.document->root.get();
     } else {

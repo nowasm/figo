@@ -18,7 +18,7 @@
 #include <windows.h>
 #endif
 
-namespace figmalib {
+namespace figo {
 
 namespace {
 
@@ -552,4 +552,4 @@ std::string FontProvider::fallbackFontFor(unsigned long codepoint, int weight, b
     return {};
 }
 
-}  // namespace figmalib
+}  // namespace figo

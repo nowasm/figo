@@ -7,7 +7,7 @@
 
 #include "svg_path.h"
 
-namespace figmalib {
+namespace figo {
 
 namespace {
 
@@ -1391,4 +1391,4 @@ tvg::Scene* buildNodeScene(Node& node, const Mat23& parentAbs, BuildContext& ctx
     return scene;
 }
 
-}  // namespace figmalib
+}  // namespace figo

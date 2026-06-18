@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <string>
 
-#include <figmalib/figmalib.h>
+#include <figo/figo.h>
 
 static int g_failures = 0;
 
@@ -20,8 +20,8 @@ static int g_failures = 0;
         }                                                                         \
     } while (0)
 
-static figmalib::Node* child(figmalib::Node& parent, const char* name) {
-    figmalib::Node* n = parent.findByName(name);
+static figo::Node* child(figo::Node& parent, const char* name) {
+    figo::Node* n = parent.findByName(name);
     if (!n) {
         std::printf("FAIL: node \"%s\" not found\n", name);
         ++g_failures;
@@ -66,11 +66,11 @@ static void testConstraints() {
         }]
       }
     })";
-    auto doc = figmalib::parseDocument(json);
-    figmalib::Node* root = doc->findByName("root");
-    figmalib::layoutFrame(*root, 800, 600);
+    auto doc = figo::parseDocument(json);
+    figo::Node* root = doc->findByName("root");
+    figo::layoutFrame(*root, 800, 600);
 
-    figmalib::Node* n = child(*root, "min");
+    figo::Node* n = child(*root, "min");
     CHECK_NEAR("x", n->relativeTransform.m02, 10);
     CHECK_NEAR("w", n->width, 50);
 
@@ -94,7 +94,7 @@ static void testConstraints() {
     CHECK_NEAR("h", n->height, 120);
 
     // Reset restores authored geometry exactly.
-    figmalib::resetLayout(*root);
+    figo::resetLayout(*root);
     CHECK_NEAR("reset w", root->width, 400);
     CHECK_NEAR("reset child x", child(*root, "max")->relativeTransform.m02, 340);
 }
@@ -131,11 +131,11 @@ static void testAutoLayoutColumn() {
         }]
       }
     })";
-    auto doc = figmalib::parseDocument(json);
-    figmalib::Node* root = doc->findByName("root");
-    figmalib::layoutFrame(*root, 400, 500);
+    auto doc = figo::parseDocument(json);
+    figo::Node* root = doc->findByName("root");
+    figo::layoutFrame(*root, 400, 500);
 
-    figmalib::Node* n = child(*root, "header");
+    figo::Node* n = child(*root, "header");
     CHECK_NEAR("x", n->relativeTransform.m02, 10);
     CHECK_NEAR("y", n->relativeTransform.m12, 10);
     CHECK_NEAR("w", n->width, 380);  // stretched to inner width
@@ -181,12 +181,12 @@ static void testSpaceBetween() {
         }]
       }
     })";
-    auto doc = figmalib::parseDocument(json);
-    figmalib::Node* root = doc->findByName("root");
-    figmalib::layoutFrame(*root, 620, 60);
+    auto doc = figo::parseDocument(json);
+    figo::Node* root = doc->findByName("root");
+    figo::layoutFrame(*root, 620, 60);
 
     // inner = 600; gaps = (600 - 180) / 2 = 210
-    figmalib::Node* n = child(*root, "a");
+    figo::Node* n = child(*root, "a");
     CHECK_NEAR("x", n->relativeTransform.m02, 10);
     CHECK_NEAR("y", n->relativeTransform.m12, 20);  // centered in 60-high frame
     n = child(*root, "b");
@@ -237,18 +237,18 @@ static void testHugAndAbsolute() {
         }]
       }
     })";
-    auto doc = figmalib::parseDocument(json);
-    figmalib::Node* root = doc->findByName("root");
-    figmalib::layoutFrame(*root, 320, 200);
+    auto doc = figo::parseDocument(json);
+    figo::Node* root = doc->findByName("root");
+    figo::layoutFrame(*root, 320, 200);
 
-    figmalib::Node* card = child(*root, "card");
+    figo::Node* card = child(*root, "card");
     CHECK_NEAR("card w", card->width, 320);   // stretched across the root
     CHECK_NEAR("card h", card->height, 100);  // hug: 45+10+45
 
     CHECK_NEAR("row1 w", child(*card, "row1")->width, 320);
     CHECK_NEAR("row2 y", child(*card, "row2")->relativeTransform.m12, 55);
 
-    figmalib::Node* badge = child(*card, "badge");  // right margin stays 10
+    figo::Node* badge = child(*card, "badge");  // right margin stays 10
     CHECK_NEAR("badge x", badge->relativeTransform.m02, 290);
     CHECK_NEAR("badge y", badge->relativeTransform.m12, 10);
 }
@@ -279,11 +279,11 @@ static void testWrap() {
         }]
       }
     })";
-    auto doc = figmalib::parseDocument(json);
-    figmalib::Node* root = doc->findByName("root");
-    figmalib::layoutFrame(*root, 230, 100);  // fits two chips (100+10+100)
+    auto doc = figo::parseDocument(json);
+    figo::Node* root = doc->findByName("root");
+    figo::layoutFrame(*root, 230, 100);  // fits two chips (100+10+100)
 
-    figmalib::Node* n = child(*root, "a");
+    figo::Node* n = child(*root, "a");
     CHECK_NEAR("x", n->relativeTransform.m02, 0);
     CHECK_NEAR("y", n->relativeTransform.m12, 0);
     n = child(*root, "b");
@@ -315,13 +315,13 @@ static void testMinMax() {
         }]
       }
     })";
-    auto doc = figmalib::parseDocument(json);
-    figmalib::Node* root = doc->findByName("root");
+    auto doc = figo::parseDocument(json);
+    figo::Node* root = doc->findByName("root");
 
-    figmalib::layoutFrame(*root, 600, 100);  // stretch would hit 580 → capped 300
+    figo::layoutFrame(*root, 600, 100);  // stretch would hit 580 → capped 300
     CHECK_NEAR("maxW", child(*root, "capped")->width, 300);
 
-    figmalib::layoutFrame(*root, 200, 40);  // stretch would hit 20 → floored 60
+    figo::layoutFrame(*root, 200, 40);  // stretch would hit 20 → floored 60
     CHECK_NEAR("minH", child(*root, "capped")->height, 60);
 }
 
@@ -378,16 +378,16 @@ static void testVariants() {
         }]
       }
     })";
-    auto ui = figmalib::FigmaUI::fromJson(json);
+    auto ui = figo::FigmaUI::fromJson(json);
 
     if (!ui->setVariant("btn", "State", "Hover")) {
         std::printf("FAIL %s: setVariant(Hover) returned false\n", __func__);
         ++g_failures;
         return;
     }
-    figmalib::Node* btn = ui->document().findByName("btn");
+    figo::Node* btn = ui->document().findByName("btn");
     CHECK_NEAR("componentId", btn->componentId == "5:4" ? 1.f : 0.f, 1.f);
-    figmalib::Node* bg = btn->findByName("bg-hover");
+    figo::Node* bg = btn->findByName("bg-hover");
     if (!bg) {
         std::printf("FAIL %s: hover background missing after switch\n", __func__);
         ++g_failures;

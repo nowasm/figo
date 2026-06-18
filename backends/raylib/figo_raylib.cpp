@@ -1,10 +1,10 @@
-#include "figmalib_raylib.h"
+#include "figo_raylib.h"
 
 #include <utility>
 
 #include <rlgl.h>
 
-namespace figmalib {
+namespace figo {
 
 RaylibFigmaView::~RaylibFigmaView() {
     if (texture_.id != 0) UnloadTexture(texture_);
@@ -267,4 +267,4 @@ void RaylibFigmaView::draw(int x, int y, ::Color tint) const {
     }
 }
 
-}  // namespace figmalib
+}  // namespace figo

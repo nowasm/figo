@@ -1,5 +1,5 @@
 #pragma once
-// Builds a ThorVG scene graph from a figmalib node tree.
+// Builds a ThorVG scene graph from a figo node tree.
 
 #include <array>
 #include <string>
@@ -7,10 +7,10 @@
 
 #include <thorvg.h>
 
-#include "figmalib/document.h"
+#include "figo/document.h"
 #include "font_provider.h"
 
-namespace figmalib {
+namespace figo {
 
 // One scrolled child of a scrolling frame: enough to retarget its scene (and
 // its own clipper, which does not inherit the scene's local transform) when
@@ -53,4 +53,4 @@ int textByteFromPoint(const Node& n, BuildContext& ctx, float x, float y);
 bool textSelectionRects(const Node& n, int a, int b, BuildContext& ctx,
                         std::vector<std::array<float, 4>>& outRects);
 
-}  // namespace figmalib
+}  // namespace figo

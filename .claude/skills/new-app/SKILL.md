@@ -1,14 +1,14 @@
 ---
 name: new-app
-description: 用 figmalib 从零做一个 app（设计 .fig + 逻辑 .js）的端到端工作流。当用户要"做一个 app / 一个页面 / 一个原型"，或要新建/改写一个 figmaplay app 工程时使用。覆盖：脚手架 → 设计（figmaedit MCP）→ 写逻辑 → 截图自验 → 迭代。
+description: 用 figo 从零做一个 app（设计 .fig + 逻辑 .js）的端到端工作流。当用户要"做一个 app / 一个页面 / 一个原型"，或要新建/改写一个 figmaplay app 工程时使用。覆盖：脚手架 → 设计（figmaedit MCP）→ 写逻辑 → 截图自验 → 迭代。
 ---
 
-# 用 figmalib 做一个 app
+# 用 figo 做一个 app
 
 一个 app = **设计（.fig/canvas.json）+ 逻辑（app.js）+ `app.json`**，渲染走
 ThorVG，逻辑跑在 QuickJS。下面是从零做出来的闭环，**按顺序走，每步都自验**。
 
-完整 JS API 见 `include/figmalib/script.h` 头注；CLAUDE.md 有构建/坑位速查。
+完整 JS API 见 `include/figo/script.h` 头注；CLAUDE.md 有构建/坑位速查。
 
 ## 0. 先想清楚（30 秒）
 - **形态** → 选模板：列表类 `list-detail`，多页带底部导航 `tab-shell`，表单 `form`。

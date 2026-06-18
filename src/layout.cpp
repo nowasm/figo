@@ -14,14 +14,14 @@
 //  - groups resize by scaling child positions/sizes proportionally
 //  - hug measurement of a WRAP container uses its no-wrap extent
 
-#include "figmalib/layout.h"
+#include "figo/layout.h"
 
 #include <algorithm>
 #include <optional>
 #include <utility>
 #include <vector>
 
-namespace figmalib {
+namespace figo {
 
 namespace {
 
@@ -380,4 +380,4 @@ void layoutFrame(Node& frame, float width, float height) {
     layoutChildren(frame);
 }
 
-}  // namespace figmalib
+}  // namespace figo

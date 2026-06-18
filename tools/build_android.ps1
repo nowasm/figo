@@ -8,7 +8,7 @@
 # runtime; -PackageId/-AppName/-VersionName/-VersionCode/-OutApk set metadata.
 param(
     [string]$AppDir = "",
-    [string]$PackageId = "com.figmalib.play",
+    [string]$PackageId = "com.figo.play",
     [string]$AppName = "figmaplay",
     [string]$VersionName = "1.0",
     [int]$VersionCode = 1,

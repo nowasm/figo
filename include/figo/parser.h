@@ -1,5 +1,5 @@
 #pragma once
-// figmalib — Figma REST API JSON parser.
+// figo — Figma REST API JSON parser.
 //
 // Accepts the JSON returned by `GET /v1/files/:key?geometry=paths`
 // (or an equivalent local export). The top-level object must contain a
@@ -10,7 +10,7 @@
 
 #include "document.h"
 
-namespace figmalib {
+namespace figo {
 
 // Parse Figma file JSON from a string. Throws std::runtime_error on malformed input.
 std::unique_ptr<Document> parseDocument(const std::string& jsonText);
@@ -31,14 +31,14 @@ struct LoadedFile {
 //   *.fig          → converted via the fig2json CLI (see below), then parsed
 //   canvas.json    → fig2json format (auto-detected)
 //   *.json         → Figma REST API format
-// fig2json discovery: $FIGMALIB_FIG2JSON, then PATH, then the compile-time
-// default (FIGMALIB_FIG2JSON_DEFAULT). Conversion output is cached next to
+// fig2json discovery: $FIGO_FIG2JSON, then PATH, then the compile-time
+// default (FIGO_FIG2JSON_DEFAULT). Conversion output is cached next to
 // the .fig file in "<name>.fig.export/" and reused while up to date.
 LoadedFile loadFigmaFile(const std::string& path);
 
 // Serialize a document to Figma-REST-style JSON that parseDocument() reads
-// back losslessly (figmalib's save format). Runtime overrides are not saved.
+// back losslessly (figo's save format). Runtime overrides are not saved.
 std::string writeDocumentJson(const Document& doc);
 bool saveDocumentFile(const Document& doc, const std::string& path);
 
-}  // namespace figmalib
+}  // namespace figo

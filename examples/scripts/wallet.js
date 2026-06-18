@@ -1,5 +1,5 @@
 // wallet.js — the demo_wallet app expressed as pure script.
-// Run with: figmaplay wallet.fig wallet.js   (see figmalib/script.h for the API)
+// Run with: figmaplay wallet.fig wallet.js   (see figo/script.h for the API)
 
 const portfolio = [
     { symbol: "ETH", change: "+ 2.56", usd: "$4.240,50", amount: "25 ETH", rate: "$420,50" },

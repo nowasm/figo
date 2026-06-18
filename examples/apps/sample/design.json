@@ -1,5 +1,5 @@
 {
-  "name": "figmalib sample UI",
+  "name": "figo sample UI",
   "document": {
     "id": "0:0",
     "name": "Document",
@@ -92,7 +92,7 @@
                 "type": "TEXT",
                 "size": { "x": 600, "y": 24 },
                 "relativeTransform": [[1, 0, 100], [0, 1, 212]],
-                "characters": "A figmalib demo - Figma rendered by ThorVG inside raylib",
+                "characters": "A figo demo - Figma rendered by ThorVG inside raylib",
                 "style": {
                   "fontFamily": "Segoe UI",
                   "fontWeight": 400,

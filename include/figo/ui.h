@@ -1,5 +1,5 @@
 #pragma once
-// figmalib — high-level UI runtime.
+// figo — high-level UI runtime.
 //
 // Owns a parsed Figma document plus a renderer and adds frame selection,
 // hit-testing, pointer input and per-node callbacks. This is the API game
@@ -14,7 +14,7 @@
 #include "document.h"
 #include "renderer.h"
 
-namespace figmalib {
+namespace figo {
 
 class FigmaUI {
 public:
@@ -189,4 +189,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace figmalib
+}  // namespace figo

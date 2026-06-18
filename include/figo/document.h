@@ -1,5 +1,5 @@
 #pragma once
-// figmalib — Figma document model
+// figo — Figma document model
 // In-memory representation of a Figma file (REST API JSON, geometry=paths).
 
 #include <array>
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace figmalib {
+namespace figo {
 
 struct Color {
     float r = 0, g = 0, b = 0, a = 1;
@@ -220,7 +220,7 @@ struct NodeData {
     std::string componentId;
 
     // web2canvas: the SOURCE component type that rendered this node (from the
-    // React fiber), set only on a component's root element. fapp2godot groups
+    // React fiber), set only on a component's root element. figo2godot groups
     // every instance of a type into one prefab. Empty for plain DOM elements.
     std::string compType;
 
@@ -316,4 +316,4 @@ struct Document {
     void captureBaseLayout();
 };
 
-}  // namespace figmalib
+}  // namespace figo

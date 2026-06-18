@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // web2canvas — render a React/HTML page in a headless browser and convert the
-// computed DOM into figmalib canvas.json (the same format fig2json emits and
-// figmalib / fapp2godot consume).
+// computed DOM into figo canvas.json (the same format fig2json emits and
+// figo / figo2godot consume).
 //
 //   node index.js <url|file.html> [-o out.canvas.json] [--root SELECTOR]
 //                 [--viewport WxH] [--browser msedge|chrome] [--wait MS]
@@ -74,7 +74,7 @@ function startStaticServer(rootDir) {
 }
 
 // Serve CDN scripts from vendored node_modules (byte-identical → SRI passes),
-// abort web fonts so networkidle settles (figmalib supplies its own fonts).
+// abort web fonts so networkidle settles (figo supplies its own fonts).
 async function setupCdnRoutes(page) {
   const nm = path.join(__dirname, 'node_modules');
   await page.route(/(unpkg\.com|cdn\.jsdelivr\.net\/npm)\//, (route) => {
@@ -447,7 +447,7 @@ function collectorFn({ rootSelector, aiName }) {
         const y1 = Math.min(window.innerHeight, out.rect.y + oy + out.rect.h + gm);
         out.glowClip = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
         out.rect = { x: x0 - ox, y: y0 - oy, w: x1 - x0, h: y1 - y0 };
-        // KEEP out.effect: it's baked into the expanded sprite (fapp2godot never
+        // KEEP out.effect: it's baked into the expanded sprite (figo2godot never
         // re-draws shadows), but the flag must stay so the node is NOT 9-sliced —
         // a glow panel'd middle would stretch into the glow margin and balloon
         // the panel (button_47 grew once the effect was cleared and it sliced).
@@ -642,7 +642,7 @@ function mapNode(n, parent) {
   // Carry the AI-naming candidate id (stripped before writing) so the live
   // element can be screenshot and the node renamed from the vision pass.
   if (n.cand != null) node._cand = n.cand;
-  // Emit source-component identity (kept in the canvas.json) so fapp2godot can
+  // Emit source-component identity (kept in the canvas.json) so figo2godot can
   // group every instance of a component type into one prefab.
   if (n.compRoot) { node.comp = n.comp; node.compRoot = true; }
   if (!n.raster) { const rot = rotationDeg(n.transform); if (Math.abs(rot) > 0.1) node.transform.rotation = +rot.toFixed(2); }
@@ -740,7 +740,7 @@ async function runStep(page, raw, navFn, defaultWait) {
 
 // Cheap structural key: group repeated components (e.g. 11 identical player
 // cards) so each unique shape is named once. EXCLUDES text content so cards that
-// differ only in their labels still share a name (fapp2godot's prefab dedup is
+// differ only in their labels still share a name (figo2godot's prefab dedup is
 // structural too).
 function candKey(node) {
   const w = Math.round((node.size && node.size.x || 0) / 6);

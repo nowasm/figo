@@ -1,4 +1,4 @@
-// fig2json "canvas.json" → figmalib::Document.
+// fig2json "canvas.json" → figo::Document.
 //
 // Ported from fig2psd's input/load.ts + render/paths.ts. The format differs
 // from the Figma REST API in several ways this file normalizes:
@@ -25,9 +25,9 @@
 
 #include <nlohmann/json.hpp>
 
-#include "figmalib/parser.h"
+#include "figo/parser.h"
 
-namespace figmalib {
+namespace figo {
 
 using json = nlohmann::json;
 
@@ -1299,7 +1299,7 @@ std::unique_ptr<Document> parseCanvasDocument(const std::string& jsonText) {
     json root = json::parse(jsonText);
     auto docIt = root.find("document");
     if (docIt == root.end() || !docIt->is_object())
-        throw std::runtime_error("figmalib: canvas.json has no \"document\" field");
+        throw std::runtime_error("figo: canvas.json has no \"document\" field");
 
     // Lookups for hydration.
     std::unordered_map<std::string, const json*> components;
@@ -1326,4 +1326,4 @@ std::unique_ptr<Document> parseCanvasDocument(const std::string& jsonText) {
     return out;
 }
 
-}  // namespace figmalib
+}  // namespace figo

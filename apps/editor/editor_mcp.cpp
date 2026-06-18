@@ -30,14 +30,14 @@ namespace figmaedit {
 namespace {
 
 using json = nlohmann::json;
-using figmalib::AutoLayout;
-using figmalib::Constraint;
-using figmalib::Effect;
-using figmalib::NodeType;
-using figmalib::Paint;
-using figmalib::PaintType;
-using figmalib::StrokeAlign;
-using figmalib::TextStyle;
+using figo::AutoLayout;
+using figo::Constraint;
+using figo::Effect;
+using figo::NodeType;
+using figo::Paint;
+using figo::PaintType;
+using figo::StrokeAlign;
+using figo::TextStyle;
 
 constexpr const char* kServerVersion = "0.1.0";
 
@@ -71,7 +71,7 @@ std::string base64(const unsigned char* data, size_t len) {
     return out;
 }
 
-std::string colorToHex(const figmalib::Color& c) {
+std::string colorToHex(const figo::Color& c) {
     auto b = [](float v) {
         return static_cast<int>(std::lround(std::max(0.0f, std::min(1.0f, v)) * 255));
     };
@@ -83,7 +83,7 @@ std::string colorToHex(const figmalib::Color& c) {
     return buf;
 }
 
-figmalib::Color parseColor(const std::string& in) {
+figo::Color parseColor(const std::string& in) {
     const char* s = in.c_str();
     if (*s == '#') ++s;
     const size_t n = std::strlen(s);
@@ -95,7 +95,7 @@ figmalib::Color parseColor(const std::string& in) {
         throw ToolError("bad color '" + in + "'");
     };
     auto byte = [&](size_t i) { return (nib(s[i]) * 16 + nib(s[i + 1])) / 255.0f; };
-    figmalib::Color c;
+    figo::Color c;
     c.r = byte(0);
     c.g = byte(2);
     c.b = byte(4);
@@ -259,7 +259,7 @@ Paint paintFromJson(const json& v) {
     if (!v.contains("stops") || !v["stops"].is_array() || v["stops"].size() < 2)
         throw ToolError("gradient paint needs >=2 \"stops\"");
     for (const auto& s : v["stops"]) {
-        figmalib::GradientStop stop;
+        figo::GradientStop stop;
         stop.position = s.value("position", 0.0f);
         stop.color = parseColor(s.at("color").get<std::string>());
         p.stops.push_back(stop);
@@ -614,7 +614,7 @@ void applyFields(Node* n, const json& u) {
     if (u.contains("layoutAlignStretch")) n->layoutAlignStretch = u["layoutAlignStretch"].get<bool>();
     if (u.contains("layoutAbsolute")) n->layoutAbsolute = u["layoutAbsolute"].get<bool>();
     if (u.contains("svgPath")) {
-        figmalib::PathGeometry g;
+        figo::PathGeometry g;
         g.path = u["svgPath"].get<std::string>();
         g.evenOdd = u.value("evenOdd", false);
         n->fillGeometry.clear();
@@ -848,7 +848,7 @@ json toolDuplicateNode(EditorState& ed, const json& a) {
     requireDoc(ed);
     Node* src = findNodeArg(ed, a, "id");
     if (!src->parent) throw ToolError("cannot duplicate the page/root");
-    auto copy = figmalib::cloneNode(*src, src->parent);
+    auto copy = figo::cloneNode(*src, src->parent);
     assignFreshIds(ed, *copy);
     copy->relativeTransform.m02 += a.value("dx", 10.0f);
     copy->relativeTransform.m12 += a.value("dy", 10.0f);
@@ -998,7 +998,7 @@ json toolGetScreenshot(EditorState& ed, const json& a) {
     const int tw = std::max(1, static_cast<int>(std::ceil(b.w() * s)));
     const int th = std::max(1, static_cast<int>(std::ceil(b.h() * s)));
 
-    figmalib::Renderer r;
+    figo::Renderer r;
     for (const auto& dir : ed.fontDirs) r.registerFontsFromDirectory(dir);
     if (!ed.imageDir.empty()) r.setImageDirectory(ed.imageDir);
     r.setFrame(ed.page);
@@ -1037,7 +1037,7 @@ json toolGetScreenshot(EditorState& ed, const json& a) {
 json toolSaveDocument(EditorState& ed, const json& a) {
     requireDoc(ed);
     if (a.contains("path")) ed.savePath = a["path"].get<std::string>();
-    if (!figmalib::saveDocumentFile(*ed.file.document, ed.savePath))
+    if (!figo::saveDocumentFile(*ed.file.document, ed.savePath))
         throw ToolError("save failed: " + ed.savePath);
     ed.unsaved = false;
     ed.setStatus("MCP: saved " + ed.savePath);
@@ -1166,7 +1166,7 @@ const json& toolsJson() {
 },
 {
   "name": "save_document",
-  "description": "Save to the editor's save path (<original>.figmalib.json) or an explicit path. The saved JSON reloads losslessly in figmalib/figmaedit.",
+  "description": "Save to the editor's save path (<original>.figo.json) or an explicit path. The saved JSON reloads losslessly in figo/figmaedit.",
   "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}}
 },
 {

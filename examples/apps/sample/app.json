@@ -6,7 +6,7 @@
   "entryFrame": "MainMenu",
   "designSystem": "linear-app",
   "package": {
-    "id": "com.figmalib.sample",
+    "id": "com.figo.sample",
     "version": "1.0.0"
   }
 }

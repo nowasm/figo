@@ -1,13 +1,13 @@
-// Document → Figma-REST-style JSON (figmalib's save format).
+// Document → Figma-REST-style JSON (figo's save format).
 // parseDocument() reads this back losslessly, so the editor can round-trip.
 
 #include <fstream>
 
 #include <nlohmann/json.hpp>
 
-#include "figmalib/parser.h"
+#include "figo/parser.h"
 
-namespace figmalib {
+namespace figo {
 
 using json = nlohmann::json;
 
@@ -236,4 +236,4 @@ bool saveDocumentFile(const Document& doc, const std::string& path) {
     return f.good();
 }
 
-}  // namespace figmalib
+}  // namespace figo

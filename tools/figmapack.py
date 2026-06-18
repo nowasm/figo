@@ -116,10 +116,10 @@ def version_code(ver):
 
 
 def run_fig2json(fig_path, out_dir):
-    exe = os.environ.get("FIGMALIB_FIG2JSON",
+    exe = os.environ.get("FIGO_FIG2JSON",
                          os.path.join(ROOT, "..", "fig2json", "target", "release", "fig2json.exe"))
     if not os.path.isfile(exe):
-        die(f"design is a .fig but fig2json not found at {exe} (set FIGMALIB_FIG2JSON)")
+        die(f"design is a .fig but fig2json not found at {exe} (set FIGO_FIG2JSON)")
     log(f"fig2json {os.path.basename(fig_path)} -> canvas.json")
     subprocess.check_call([exe, fig_path, out_dir])
 
@@ -186,13 +186,13 @@ def embed_win_icon(ico):
     rc = cmd_wrapper([
         f'call "{VCVARS}" >nul 2>&1',
         f'cd /d "{build}"',
-        f'cmake -DFIGMALIB_WIN_ICON={icop} . >nul',
+        f'cmake -DFIGO_WIN_ICON={icop} . >nul',
         'cmake --build . --config Release --target figmaplay',
     ])
     cmd_wrapper([  # restore: drop the icon resource from the dev build's cache
         f'call "{VCVARS}" >nul 2>&1',
         f'cd /d "{build}"',
-        'cmake -DFIGMALIB_WIN_ICON= . >nul',
+        'cmake -DFIGO_WIN_ICON= . >nul',
     ])
     return rc == 0
 
@@ -236,7 +236,7 @@ def pack_web(stage, m, out, icon):
         f'call "{emsdk}\\emsdk_env.bat" >nul 2>&1',
         f'cd /d "{ROOT}"',
         f'call emcmake cmake -B build_web -G Ninja -DCMAKE_BUILD_TYPE=Release '
-        f'-DFIGMALIB_WEB_APP_DIR={app}{extra}',
+        f'-DFIGO_WEB_APP_DIR={app}{extra}',
         'if errorlevel 1 exit /b 1',
         'ninja -C build_web figmaplay',
     ])

@@ -3,7 +3,7 @@
 //   figmaplay [design.fig] [logic.js] [--selfdrive prefix]
 //             [--shot out.png] [--frames N]
 //
-// All behavior lives in the script (see figmalib/script.h for the JS API);
+// All behavior lives in the script (see figo/script.h for the JS API);
 // this host only loads the two files and runs the frame loop. With no
 // arguments it plays the wallet demo (examples/scripts/wallet.js).
 // The script hot-reloads: save the .js and the running app rebuilds its
@@ -30,9 +30,9 @@
 #include <nlohmann/json.hpp>
 #include <raylib.h>
 
-#include <figmalib/figmalib.h>
-#include <figmalib/script.h>
-#include <figmalib_raylib.h>
+#include <figo/figo.h>
+#include <figo/script.h>
+#include <figo_raylib.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -97,9 +97,9 @@ struct Player {
     std::string fontsDir, entryFrame;
     std::string appInject = "globalThis.APP = {};";
 
-    std::unique_ptr<figmalib::FigmaUI> ui;
-    std::unique_ptr<figmalib::ScriptHost> host;
-    std::unique_ptr<figmalib::RaylibFigmaView> view;
+    std::unique_ptr<figo::FigmaUI> ui;
+    std::unique_ptr<figo::ScriptHost> host;
+    std::unique_ptr<figo::RaylibFigmaView> view;
     std::filesystem::file_time_type scriptStamp;
     std::error_code fsEc;
     int frame = 0;
@@ -159,7 +159,7 @@ struct Player {
 
     bool loadScript() {
         ui->clearHandlers();  // the script re-registers everything it needs
-        host = std::make_unique<figmalib::ScriptHost>(*ui);
+        host = std::make_unique<figo::ScriptHost>(*ui);
         host->setStoragePath(script + ".storage.json");
         if (drivePrefix) host->eval("globalThis.SELFDRIVE = true;", "<selfdrive>");
         if (!shotPath.empty()) host->eval("globalThis.SHOT = true;", "<shot>");
@@ -294,7 +294,7 @@ int main(int argc, char** argv) {
     if (p->script.empty()) p->script = assetBase + "/scripts/wallet.js";
 #endif
 
-    p->ui = figmalib::FigmaUI::fromFile(p->design);
+    p->ui = figo::FigmaUI::fromFile(p->design);
 #if defined(__EMSCRIPTEN__)
     // No system fonts in the browser: the design's font files ship in the
     // preloaded FS.
@@ -308,7 +308,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     p->scriptStamp = std::filesystem::last_write_time(p->script, p->fsEc);
-    p->view = std::make_unique<figmalib::RaylibFigmaView>(*p->ui);
+    p->view = std::make_unique<figo::RaylibFigmaView>(*p->ui);
 
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(emFrame, 0 /*use rAF*/, 1 /*never returns*/);

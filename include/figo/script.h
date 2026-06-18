@@ -1,5 +1,5 @@
 #pragma once
-// figmalib — JS scripting host (QuickJS).
+// figo — JS scripting host (QuickJS).
 //
 // Turns an app into <design.fig> + <logic.js>: the script gets a global `ui`
 // object bound to a FigmaUI plus `console.log`. The host app only loads the
@@ -40,7 +40,7 @@
 #include <memory>
 #include <string>
 
-namespace figmalib {
+namespace figo {
 
 class FigmaUI;
 
@@ -70,4 +70,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace figmalib
+}  // namespace figo

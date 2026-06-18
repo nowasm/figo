@@ -34,7 +34,7 @@ def tokens(system):
 
 
 def rgba(hex_or_css, alpha=1.0):
-    """#rrggbb / #rrggbbaa / rgba(r,g,b,a) -> figmalib color {r,g,b,a} in 0..1."""
+    """#rrggbb / #rrggbbaa / rgba(r,g,b,a) -> figo color {r,g,b,a} in 0..1."""
     s = hex_or_css.strip()
     m = re.match(r"rgba?\(([^)]+)\)", s)
     if m:

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <figmalib/figmalib.h>
+#include <figo/figo.h>
 
 #ifndef ASSETS_DIR
 #define ASSETS_DIR "."
@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     // Optional argument: any supported input (.fig, canvas.json, REST JSON).
     const std::string input = argc > 1 ? argv[1] : ASSETS_DIR "/sample_ui.json";
     std::printf("loading %s\n", input.c_str());
-    auto ui = figmalib::FigmaUI::fromFile(input);
+    auto ui = figo::FigmaUI::fromFile(input);
     ui->setViewport(900, 640);
 
     int failures = 0;
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
     // Responsive reflow: render the first frame at a different aspect ratio
     // with constraints/auto-layout active instead of scale-to-fit.
     if (!seen.empty() && ui->selectFrame(seen.front())) {
-        ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Reflow);
+        ui->setResizeMode(figo::FigmaUI::ResizeMode::Reflow);
         ui->setViewport(1280, 720);
         if (!ui->render()) {
             std::printf("FAIL: reflow render produced no pixels\n");
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
                 ++failures;
             }
         }
-        ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Scale);
+        ui->setResizeMode(figo::FigmaUI::ResizeMode::Scale);
         ui->setViewport(900, 640);
     }
 
@@ -142,10 +142,10 @@ int main(int argc, char** argv) {
     // the pixels actually moved (and that fixed children kept the frame from
     // being a pure translate — any change at all passes).
     {
-        figmalib::Node* scrollable = nullptr;
+        figo::Node* scrollable = nullptr;
         for (const auto& frameName : seen) {
             if (!ui->selectFrame(frameName)) continue;
-            ui->currentFrame()->visit([&](figmalib::Node& n) {
+            ui->currentFrame()->visit([&](figo::Node& n) {
                 if (!scrollable && n.scrolls() &&
                     (n.maxScrollX() > 0 || n.maxScrollY() > 0)) {
                     scrollable = &n;
@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
             }
             // Resize while scrolled: a viewport tall enough to swallow the
             // scroll range must pull the offset back in (window-resize bug).
-            ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Reflow);
+            ui->setResizeMode(figo::FigmaUI::ResizeMode::Reflow);
             ui->setViewport(900, 640);
             ui->setScroll(scrollable->name, scrollable->maxScrollX(),
                           scrollable->maxScrollY());
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
                             scrollable->scrollX, scrollable->scrollY,
                             scrollable->maxScrollX(), scrollable->maxScrollY());
             }
-            ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Scale);
+            ui->setResizeMode(figo::FigmaUI::ResizeMode::Scale);
             ui->setViewport(900, 640);
             ui->setScroll(scrollable->name, 0, 0);
         }
@@ -211,11 +211,11 @@ int main(int argc, char** argv) {
     // Text measurement drives layout: in Reflow mode an auto-height text node
     // must grow when a longer string wraps to more lines.
     {
-        figmalib::Node* textNode = nullptr;
+        figo::Node* textNode = nullptr;
         for (const auto& frameName : seen) {
             if (!ui->selectFrame(frameName)) continue;
-            ui->currentFrame()->visit([&](figmalib::Node& n) {
-                if (!textNode && n.type == figmalib::NodeType::Text && n.width > 40 &&
+            ui->currentFrame()->visit([&](figo::Node& n) {
+                if (!textNode && n.type == figo::NodeType::Text && n.width > 40 &&
                     !n.characters.empty()) {
                     textNode = &n;
                 }
@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
             const std::string savedChars = textNode->characters;
             const std::string savedResize = textNode->textStyle.autoResize;
             textNode->textStyle.autoResize = "HEIGHT";
-            ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Reflow);
+            ui->setResizeMode(figo::FigmaUI::ResizeMode::Reflow);
             ui->setViewport(900, 640);
             ui->render();
             const float before = textNode->height;
@@ -250,7 +250,7 @@ int main(int argc, char** argv) {
             }
             textNode->characters = savedChars;
             textNode->textStyle.autoResize = savedResize;
-            ui->setResizeMode(figmalib::FigmaUI::ResizeMode::Scale);
+            ui->setResizeMode(figo::FigmaUI::ResizeMode::Scale);
             ui->setViewport(900, 640);
         }
     }
@@ -258,11 +258,11 @@ int main(int argc, char** argv) {
     // Text editing: focus an editable node, type (incl. CJK), navigate, and
     // delete; the caret must also show up in the pixels.
     {
-        figmalib::Node* textNode = nullptr;
+        figo::Node* textNode = nullptr;
         for (const auto& frameName : seen) {
             if (!ui->selectFrame(frameName)) continue;
-            ui->currentFrame()->visit([&](figmalib::Node& n) {
-                if (!textNode && n.type == figmalib::NodeType::Text &&
+            ui->currentFrame()->visit([&](figo::Node& n) {
+                if (!textNode && n.type == figo::NodeType::Text &&
                     !n.characters.empty()) {
                     textNode = &n;
                 }
@@ -284,9 +284,9 @@ int main(int argc, char** argv) {
 
             ui->focusText("__edit_target__");          // caret at end
             ui->textInput("c你好");                     // ab|c你好
-            ui->editKey(figmalib::FigmaUI::EditKey::Backspace);  // drop 好
-            ui->editKey(figmalib::FigmaUI::EditKey::Left);       // skip 你
-            ui->editKey(figmalib::FigmaUI::EditKey::Left);       // skip c
+            ui->editKey(figo::FigmaUI::EditKey::Backspace);  // drop 好
+            ui->editKey(figo::FigmaUI::EditKey::Left);       // skip 你
+            ui->editKey(figo::FigmaUI::EditKey::Left);       // skip c
             ui->textInput("X");                         // ab X c你
             bool ok = textNode->characters == "abXc\xe4\xbd\xa0";
             if (!ok) {
@@ -320,16 +320,16 @@ int main(int argc, char** argv) {
     // Data-driven list: clone an auto-layout container's template child per
     // item, stamp each with text, and verify stacking + pixel changes.
     {
-        figmalib::Node* list = nullptr;
+        figo::Node* list = nullptr;
         for (const auto& frameName : seen) {
             if (!ui->selectFrame(frameName)) continue;
-            ui->currentFrame()->visit([&](figmalib::Node& n) {
+            ui->currentFrame()->visit([&](figo::Node& n) {
                 if (!list && n.autoLayout.enabled() && !n.children.empty() &&
                     n.parent && n.width > 0) {
                     // Need a text somewhere in the template to stamp.
                     bool hasText = false;
-                    n.children.front()->visit([&](figmalib::Node& t) {
-                        if (t.type == figmalib::NodeType::Text) hasText = true;
+                    n.children.front()->visit([&](figo::Node& t) {
+                        if (t.type == figo::NodeType::Text) hasText = true;
                         return !hasText;
                     });
                     if (hasText) list = &n;
@@ -347,11 +347,11 @@ int main(int argc, char** argv) {
             const uint32_t total = ui->pixelWidth() * ui->pixelHeight();
             std::vector<uint32_t> before(ui->pixels(), ui->pixels() + total);
 
-            const bool ok = ui->bindList("__list__", 5, [](figmalib::Node& item, size_t i) {
+            const bool ok = ui->bindList("__list__", 5, [](figo::Node& item, size_t i) {
                 bool done = false;
-                item.visit([&](figmalib::Node& t) {
-                    if (!done && t.type == figmalib::NodeType::Text) {
-                        figmalib::setNodeText(t, "Item " + std::to_string(i + 1));
+                item.visit([&](figo::Node& t) {
+                    if (!done && t.type == figo::NodeType::Text) {
+                        figo::setNodeText(t, "Item " + std::to_string(i + 1));
                         done = true;
                     }
                     return !done;
@@ -397,7 +397,7 @@ int main(int argc, char** argv) {
         ui->render();
         const uint32_t idBefore = ui->transitionId();
 
-        if (!ui->navigateTo(seen[1], figmalib::FigmaUI::Transition::SlideLeft, 0.3f)) {
+        if (!ui->navigateTo(seen[1], figo::FigmaUI::Transition::SlideLeft, 0.3f)) {
             std::printf("FAIL: navigateTo(%s)\n", seen[1].c_str());
             ++failures;
         } else {
@@ -438,13 +438,13 @@ int main(int argc, char** argv) {
         const bool hasFrames = ui->selectFrame("Discover") &&
                                ui->selectFrame("Marketplace") &&
                                ui->selectFrame("Discover");
-        figmalib::Node* tradeItem =
+        figo::Node* tradeItem =
             hasFrames ? ui->currentFrame()->findByName("Trade") : nullptr;
         if (!tradeItem) {
             std::printf("nav-bubble: no Discover/Trade setup (skipped)\n");
         } else {
-            ui->onClick("Trade", [&](figmalib::Node&) { ui->navigateTo("Marketplace"); });
-            ui->onClick("Discover", [&](figmalib::Node&) { ui->navigateTo("Discover"); });
+            ui->onClick("Trade", [&](figo::Node&) { ui->navigateTo("Marketplace"); });
+            ui->onClick("Discover", [&](figo::Node&) { ui->navigateTo("Discover"); });
             ui->render();  // refresh absoluteTransform for the hit test
             float cx, cy, vx, vy;
             tradeItem->absoluteTransform.apply(tradeItem->width * 0.5f,
@@ -466,7 +466,7 @@ int main(int argc, char** argv) {
     // Hit-test sanity on the sample UI: center of the start button.
     if (ui->selectFrame("MainMenu")) {
         ui->render();
-        if (figmalib::Node* hit = ui->hitTest(450, 320)) {
+        if (figo::Node* hit = ui->hitTest(450, 320)) {
             std::printf("hitTest(450,320) -> %s\n", hit->name.c_str());
         } else {
             std::printf("FAIL: hitTest(450,320) -> null\n");

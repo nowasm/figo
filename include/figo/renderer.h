@@ -1,5 +1,5 @@
 #pragma once
-// figmalib — engine-agnostic renderer.
+// figo — engine-agnostic renderer.
 //
 // Rasterizes a Figma frame into an RGBA8888 (straight-alpha) pixel buffer via
 // ThorVG's software canvas. Game-engine backends upload this buffer as a
@@ -12,7 +12,7 @@
 
 #include "document.h"
 
-namespace figmalib {
+namespace figo {
 
 class Renderer {
 public:
@@ -103,4 +103,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace figmalib
+}  // namespace figo

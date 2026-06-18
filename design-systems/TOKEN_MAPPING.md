@@ -14,7 +14,7 @@ update_nodes 描述）。颜色一律 `#RRGGBB` 或 `#RRGGBBAA`。
 |---|---|---|
 | `color` | `--accent = #5e6ad2` | 节点 `fill` / `stroke`，或 `effects[].color`。背景=容器 `fill`，文字=TEXT 节点 `fill`，边框=`stroke`+`strokeWeight` |
 | `dimension`(px) | `--text-xl = 24px` | 按语义分流（见下）：字号→`fontSize`，圆角→`cornerRadius`，间距→`autoLayout.itemSpacing`/`padding`，描边→`strokeWeight` |
-| `fontFamily` | `"Inter Variable", "Inter", …` | `fontFamily` = **取第一个具体字体名**，去引号、丢 fallback 链。若该字体未装，靠 figmalib 的字形级回退兜底（见 README 字体一节） |
+| `fontFamily` | `"Inter Variable", "Inter", …` | `fontFamily` = **取第一个具体字体名**，去引号、丢 fallback 链。若该字体未装，靠 figo 的字形级回退兜底（见 README 字体一节） |
 | `number` | `--leading-tight = 1.00` | 行高倍数 → `lineHeight`(px) = `round(倍数 × fontSize)`。figmaedit 的 `lineHeight` 是**像素**，不是倍数 |
 | `shadow` | `rgba(0,0,0,.4) 0 2px 4px` | 解析为 `effects[{type:"DROP_SHADOW", color, offsetX, offsetY, radius}]`（解析规则见下） |
 | `duration` / `cubicBezier` | `--motion-base = 200ms` | **不进设计层**。归到 JS 逻辑层：`ui.navigateTo(name, transition, durationSec)` 的时长/曲线。设计阶段忽略 |

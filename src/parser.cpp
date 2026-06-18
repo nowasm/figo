@@ -1,10 +1,10 @@
-// Figma REST API JSON → figmalib::Document.
+// Figma REST API JSON → figo::Document.
 //
 // Schema reference: https://www.figma.com/developers/api#node-types
 // Geometry path data ("fillGeometry"/"strokeGeometry") is present when the
 // file was fetched with ?geometry=paths.
 
-#include "figmalib/parser.h"
+#include "figo/parser.h"
 
 #include <fstream>
 #include <sstream>
@@ -13,7 +13,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace figmalib {
+namespace figo {
 
 using json = nlohmann::json;
 
@@ -424,7 +424,7 @@ std::unique_ptr<Document> parseDocument(const std::string& jsonText) {
     } else if (j.contains("id") && j.contains("type")) {
         rootJson = &j;  // bare node tree
     } else {
-        throw std::runtime_error("figmalib: JSON has no \"document\" node");
+        throw std::runtime_error("figo: JSON has no \"document\" node");
     }
     doc->root = parseNode(*rootJson, nullptr);
     doc->captureBaseLayout();
@@ -433,10 +433,10 @@ std::unique_ptr<Document> parseDocument(const std::string& jsonText) {
 
 std::unique_ptr<Document> loadDocumentFile(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
-    if (!f) throw std::runtime_error("figmalib: cannot open file: " + path);
+    if (!f) throw std::runtime_error("figo: cannot open file: " + path);
     std::ostringstream ss;
     ss << f.rdbuf();
     return parseDocument(ss.str());
 }
 
-}  // namespace figmalib
+}  // namespace figo

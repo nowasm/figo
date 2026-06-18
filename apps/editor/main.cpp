@@ -1,8 +1,8 @@
-// figmaedit — Figma-style editor built on figmalib + raylib + raygui.
+// figmaedit — Figma-style editor built on figo + raylib + raygui.
 //
 //   figmaedit [file.fig | canvas.json | file.json]
 //
-// Drag & drop a file onto the window to open it. Ctrl+S saves a figmalib
+// Drag & drop a file onto the window to open it. Ctrl+S saves a figo
 // JSON next to the original (never overwrites the .fig).
 
 #include <cmath>
@@ -32,7 +32,7 @@ void registerConventionFonts(EditorState& ed, const std::string& inputPath) {
     ed.fontDirs.clear();
     const fs::path sibling = fs::path(inputPath).parent_path() / "fonts";
     if (fs::is_directory(sibling, ec)) ed.fontDirs.push_back(sibling.string());
-    if (const char* env = std::getenv("FIGMALIB_FONTS_DIR"); env && *env) {
+    if (const char* env = std::getenv("FIGO_FONTS_DIR"); env && *env) {
         if (fs::is_directory(env, ec)) ed.fontDirs.push_back(env);
     }
     for (const auto& dir : ed.fontDirs) ed.renderer.registerFontsFromDirectory(dir);
@@ -44,11 +44,11 @@ namespace figmaedit {
 
 bool openFile(EditorState& ed, const std::string& path) {
     try {
-        figmalib::LoadedFile loaded = figmalib::loadFigmaFile(path);
+        figo::LoadedFile loaded = figo::loadFigmaFile(path);
         ed.invalidateCache();  // before the old document (and its nodes) dies
         ed.file = std::move(loaded);
         ed.filePath = path;
-        ed.savePath = path + ".figmalib.json";
+        ed.savePath = path + ".figo.json";
         ed.imageDir = ed.file.imageDirectory;
         if (!ed.imageDir.empty()) ed.renderer.setImageDirectory(ed.imageDir);
         registerConventionFonts(ed, path);
@@ -73,7 +73,7 @@ bool openFile(EditorState& ed, const std::string& path) {
 
 void saveFile(EditorState& ed) {
     if (!ed.file.document) return;
-    if (figmalib::saveDocumentFile(*ed.file.document, ed.savePath)) {
+    if (figo::saveDocumentFile(*ed.file.document, ed.savePath)) {
         ed.unsaved = false;
         ed.setStatus("Saved " + ed.savePath);
     } else {
@@ -101,11 +101,11 @@ static int selftest(const std::string& path) {
     };
 
     EditorState ed;
-    figmalib::LoadedFile loaded = figmalib::loadFigmaFile(path);
+    figo::LoadedFile loaded = figo::loadFigmaFile(path);
     ed.file = std::move(loaded);
     Node* page = nullptr;
     for (auto& c : ed.file.document->root->children) {
-        if (c->type == figmalib::NodeType::Canvas) {
+        if (c->type == figo::NodeType::Canvas) {
             page = c.get();
             break;
         }
@@ -144,11 +144,11 @@ static int selftest(const std::string& path) {
 
     // save round-trip
     const std::string tmp = path + ".selftest.json";
-    expect(figmalib::saveDocumentFile(*ed.file.document, tmp), "save");
-    auto reloaded = figmalib::loadFigmaFile(tmp);
+    expect(figo::saveDocumentFile(*ed.file.document, tmp), "save");
+    auto reloaded = figo::loadFigmaFile(tmp);
     Node* rpage = nullptr;
     for (auto& c : reloaded.document->root->children) {
-        if (c->type == figmalib::NodeType::Canvas) {
+        if (c->type == figo::NodeType::Canvas) {
             rpage = c.get();
             break;
         }

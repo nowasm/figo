@@ -68,16 +68,16 @@ void setNodeSize(Node& n, float w, float h) {
 
 const char* nodeIcon(const Node& n) {
     switch (n.type) {
-    case figmalib::NodeType::Frame:
-    case figmalib::NodeType::Component:
-    case figmalib::NodeType::Instance: return "#";
-    case figmalib::NodeType::Group: return "[]";
-    case figmalib::NodeType::Text: return "T";
-    case figmalib::NodeType::Ellipse: return "O";
-    case figmalib::NodeType::Vector:
-    case figmalib::NodeType::BooleanOperation:
-    case figmalib::NodeType::Star:
-    case figmalib::NodeType::RegularPolygon: return "~";
+    case figo::NodeType::Frame:
+    case figo::NodeType::Component:
+    case figo::NodeType::Instance: return "#";
+    case figo::NodeType::Group: return "[]";
+    case figo::NodeType::Text: return "T";
+    case figo::NodeType::Ellipse: return "O";
+    case figo::NodeType::Vector:
+    case figo::NodeType::BooleanOperation:
+    case figo::NodeType::Star:
+    case figo::NodeType::RegularPolygon: return "~";
     default: return "::";
     }
 }

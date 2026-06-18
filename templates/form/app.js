@@ -1,5 +1,5 @@
 // form — editable text fields + a submit button. Tap a field to edit it
-// (figmalib makes the TEXT node editable); submit reads the values back.
+// (figo makes the TEXT node editable); submit reads the values back.
 
 ui.selectFrame(APP.entryFrame || "Form");
 

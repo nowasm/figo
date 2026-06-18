@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // html2godot — one command: a React/HTML page -> a Godot 4 project.
-// Runs web2canvas (DOM -> canvas.json + images) then fapp2godot (canvas.json
+// Runs web2canvas (DOM -> canvas.json + images) then figo2godot (canvas.json
 // -> .tscn + sprites + manifest), wiring the intermediate paths together.
 //
 //   node html2godot.js <url|file.html> --out <godotDir>
 //        [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--root SEL]
-//        [--viewport WxH] [--wait MS] [--browser msedge|chrome] [--fapp2godot <exe>]
+//        [--viewport WxH] [--wait MS] [--browser msedge|chrome] [--figo2godot <exe>]
 //
 // --states reaches screens behind a window.__nav hook; --flows captures
 // click-driven popups/overlays (a JSON array of captures with interaction steps).
@@ -24,7 +24,7 @@ function arg(name, def) {
 const input = process.argv[2];
 const out = arg('--out', null);
 if (!input || input.startsWith('-') || !out) {
-  console.error('usage: html2godot <url|file.html> --out <godotDir> [--states ...] [--flows FILE] [--fonts DIR] [--root SEL] [--viewport WxH] [--wait MS] [--browser ...] [--prefabs] [--ai-name] [--fapp2godot <exe>]');
+  console.error('usage: html2godot <url|file.html> --out <godotDir> [--states ...] [--flows FILE] [--fonts DIR] [--root SEL] [--viewport WxH] [--wait MS] [--browser ...] [--prefabs] [--ai-name] [--figo2godot <exe>]');
   process.exit(2);
 }
 
@@ -33,16 +33,16 @@ const inter = path.join(path.resolve(out), '.web2canvas');
 fs.mkdirSync(inter, { recursive: true });
 const canvas = path.join(inter, 'design.canvas.json');
 
-// default fapp2godot: the repo's build output (tools/web2canvas -> ../../build_godot)
-let fapp2godot = arg('--fapp2godot', null);
-if (!fapp2godot) {
-  for (const c of ['build_godot/fapp2godot.exe', 'build/fapp2godot.exe', 'build_godot/fapp2godot']) {
+// default figo2godot: the repo's build output (tools/web2canvas -> ../../build_godot)
+let figo2godot = arg('--figo2godot', null);
+if (!figo2godot) {
+  for (const c of ['build_godot/figo2godot.exe', 'build/figo2godot.exe', 'build_godot/figo2godot']) {
     const p = path.resolve(here, '..', '..', c);
-    if (fs.existsSync(p)) { fapp2godot = p; break; }
+    if (fs.existsSync(p)) { figo2godot = p; break; }
   }
 }
-if (!fapp2godot || !fs.existsSync(fapp2godot)) {
-  console.error('FAIL: fapp2godot executable not found; pass --fapp2godot <path>');
+if (!figo2godot || !fs.existsSync(figo2godot)) {
+  console.error('FAIL: figo2godot executable not found; pass --figo2godot <path>');
   process.exit(1);
 }
 
@@ -59,12 +59,12 @@ console.log('=== web2canvas ===');
 execFileSync(process.execPath, [path.join(here, 'index.js'), input, '-o', canvas, ...passthrough],
              { stdio: 'inherit' });
 
-console.log('=== fapp2godot ===');
+console.log('=== figo2godot ===');
 const f2gArgs = [canvas, path.resolve(out)];
 if (fonts) f2gArgs.push('--fonts', fonts);
 if (process.argv.includes('--prefabs')) f2gArgs.push('--prefabs');
 const noPrefab = arg('--no-prefab', null);  // comma list of generic wrapper component types to inline
 if (noPrefab) f2gArgs.push('--no-prefab', noPrefab);
-execFileSync(fapp2godot, f2gArgs, { stdio: 'inherit' });
+execFileSync(figo2godot, f2gArgs, { stdio: 'inherit' });
 
 console.log(`\nRESULT: OK -> ${path.resolve(out)} (open in Godot 4)`);

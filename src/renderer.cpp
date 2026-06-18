@@ -1,4 +1,4 @@
-#include "figmalib/renderer.h"
+#include "figo/renderer.h"
 
 #include <algorithm>
 #include <atomic>
@@ -9,11 +9,11 @@
 
 #include <thorvg.h>
 
-#include "figmalib/layout.h"
+#include "figo/layout.h"
 #include "font_provider.h"
 #include "scene_builder.h"
 
-namespace figmalib {
+namespace figo {
 
 namespace {
 
@@ -339,4 +339,4 @@ void Renderer::setImageDirectory(const std::string& dir) {
     impl_->dirty = true;
 }
 
-}  // namespace figmalib
+}  // namespace figo

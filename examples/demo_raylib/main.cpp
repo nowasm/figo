@@ -1,4 +1,4 @@
-// figmalib demo: a Figma file rendered as the UI of a raylib "game".
+// figo demo: a Figma file rendered as the UI of a raylib "game".
 //
 // The animated starfield is the game scene; everything else on screen comes
 // from examples/assets/sample_ui.json (Figma REST API format).
@@ -8,8 +8,8 @@
 
 #include <raylib.h>
 
-#include <figmalib/figmalib.h>
-#include <figmalib_raylib.h>
+#include <figo/figo.h>
+#include <figo_raylib.h>
 
 #ifndef ASSETS_DIR
 #define ASSETS_DIR "."
@@ -30,33 +30,33 @@ int main(int argc, char** argv) {
     }
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-    InitWindow(900, 640, "figmalib - Figma UI in raylib");
+    InitWindow(900, 640, "figo - Figma UI in raylib");
 
-    auto ui = figmalib::FigmaUI::fromFile(input);
+    auto ui = figo::FigmaUI::fromFile(input);
 
     // Hover feedback: dim any button the pointer is over.
     for (const char* name : {"btn-start", "btn-options", "btn-quit", "btn-back"}) {
-        ui->onHover(name, [&ui](figmalib::Node& n, bool entered) {
+        ui->onHover(name, [&ui](figo::Node& n, bool entered) {
             ui->setOpacity(n.name, entered ? 0.8f : -1.0f);  // <0 restores authored
         });
     }
 
     bool quit = false;
     int runs = 0;
-    ui->onClick("btn-start", [&](figmalib::Node&) {
+    ui->onClick("btn-start", [&](figo::Node&) {
         ++runs;
         ui->setText("subtitle", "Game started! (run #" + std::to_string(runs) + ")");
     });
-    ui->onClick("btn-options", [&](figmalib::Node&) { ui->selectFrame("Settings"); });
-    ui->onClick("btn-back", [&](figmalib::Node&) { ui->selectFrame("MainMenu"); });
-    ui->onClick("btn-quit", [&](figmalib::Node&) { quit = true; });
+    ui->onClick("btn-options", [&](figo::Node&) { ui->selectFrame("Settings"); });
+    ui->onClick("btn-back", [&](figo::Node&) { ui->selectFrame("MainMenu"); });
+    ui->onClick("btn-quit", [&](figo::Node&) { quit = true; });
 
-    figmalib::RaylibFigmaView view(*ui);
+    figo::RaylibFigmaView view(*ui);
     if (wantGpu) {
         view.resize(GetScreenWidth(), GetScreenHeight());  // create the GL context targets
         const bool ok = view.setGpu(true);
-        SetWindowTitle(ok ? "figmalib - Figma UI in raylib [GPU]"
-                          : "figmalib - Figma UI in raylib (GL engine unavailable)");
+        SetWindowTitle(ok ? "figo - Figma UI in raylib [GPU]"
+                          : "figo - Figma UI in raylib (GL engine unavailable)");
     }
 
     // Left/right arrows page through frames (useful for multi-screen .fig files).
@@ -74,16 +74,16 @@ int main(int argc, char** argv) {
         // G toggles GPU (ThorVG GL engine) vs CPU rasterization.
         if (IsKeyPressed(KEY_G)) {
             const bool on = view.setGpu(!view.gpu());
-            SetWindowTitle(on ? "figmalib - Figma UI in raylib [GPU]"
-                              : "figmalib - Figma UI in raylib");
+            SetWindowTitle(on ? "figo - Figma UI in raylib [GPU]"
+                              : "figo - Figma UI in raylib");
         }
         // R toggles responsive reflow (constraints/auto-layout) vs scale-to-fit.
         if (IsKeyPressed(KEY_R)) {
-            const bool reflow = ui->resizeMode() == figmalib::FigmaUI::ResizeMode::Reflow;
-            ui->setResizeMode(reflow ? figmalib::FigmaUI::ResizeMode::Scale
-                                     : figmalib::FigmaUI::ResizeMode::Reflow);
-            SetWindowTitle(reflow ? "figmalib - Figma UI in raylib"
-                                  : "figmalib - Figma UI in raylib [reflow]");
+            const bool reflow = ui->resizeMode() == figo::FigmaUI::ResizeMode::Reflow;
+            ui->setResizeMode(reflow ? figo::FigmaUI::ResizeMode::Scale
+                                     : figo::FigmaUI::ResizeMode::Reflow);
+            SetWindowTitle(reflow ? "figo - Figma UI in raylib"
+                                  : "figo - Figma UI in raylib [reflow]");
         }
         view.resize(GetScreenWidth(), GetScreenHeight());
         view.update();

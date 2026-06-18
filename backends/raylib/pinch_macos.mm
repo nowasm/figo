@@ -1,4 +1,4 @@
-// figmalib — macOS trackpad pinch source (see pinch_gesture.h).
+// figo — macOS trackpad pinch source (see pinch_gesture.h).
 //
 // raylib/GLFW pump the Cocoa run loop via glfwPollEvents(); a local event
 // monitor installed here is invoked during that dispatch, so we can observe
@@ -12,7 +12,7 @@ double g_accumMagnification = 0.0;
 id g_monitor = nil;  // process-lifetime monitor; never removed
 }  // namespace
 
-namespace figmalib {
+namespace figo {
 
 void pinchGestureInstall() {
     if (g_monitor) return;
@@ -30,4 +30,4 @@ float pinchGestureConsume() {
     return m;
 }
 
-}  // namespace figmalib
+}  // namespace figo

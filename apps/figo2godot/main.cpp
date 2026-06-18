@@ -1,7 +1,7 @@
-// fapp2godot — convert a figmalib design (.fig / canvas.json / REST JSON) into
+// figo2godot — convert a figo design (.fig / canvas.json / REST JSON) into
 // a Godot 4 project: one .tscn per top-level frame + deduplicated PNG sprites +
 // a manifest.json. The design's own ThorVG rasterizer bakes the sprites, so the
-// textures are pixel-identical to the figmalib runtime.
+// textures are pixel-identical to the figo runtime.
 //
 // Node mapping:
 //   TEXT                                   -> Label (vector text, font/size/color)
@@ -31,12 +31,12 @@
 #include <string>
 #include <vector>
 
-#include <figmalib/figmalib.h>
+#include <figo/figo.h>
 #include <nlohmann/json.hpp>
 
 namespace fs = std::filesystem;
-using figmalib::Node;
-using figmalib::NodeType;
+using figo::Node;
+using figo::NodeType;
 using nlohmann::json;
 
 // ===================== PNG encoder (RGBA8, self-contained) ==================
@@ -177,13 +177,13 @@ static std::string num(float v) {
     return s;
 }
 
-static std::string colorLit(const figmalib::Color& c) {
+static std::string colorLit(const figo::Color& c) {
     return "Color(" + num(c.r) + ", " + num(c.g) + ", " + num(c.b) + ", " + num(c.a) + ")";
 }
 // A paint's effective color folds its separate `opacity` into the alpha — a
 // translucent fill (e.g. inkSoft text at 0.55) must keep that dimming, not 1.0.
-static std::string paintLit(const figmalib::Paint& p) {
-    figmalib::Color c = p.color;
+static std::string paintLit(const figo::Paint& p) {
+    figo::Color c = p.color;
     c.a *= p.opacity;
     return colorLit(c);
 }
@@ -204,13 +204,13 @@ static bool isRectish(NodeType t) {
     }
 }
 
-static const figmalib::Paint* solidFill(const Node& n) {
+static const figo::Paint* solidFill(const Node& n) {
     for (const auto& p : n.fills)
-        if (p.visible && p.type == figmalib::PaintType::Solid) return &p;
+        if (p.visible && p.type == figo::PaintType::Solid) return &p;
     return nullptr;
 }
 // 8-bit-quantized color inequality (matches how colors are emitted/grouped).
-static bool colorNe(const figmalib::Color& a, const figmalib::Color& b) {
+static bool colorNe(const figo::Color& a, const figo::Color& b) {
     return std::lround(a.r * 255) != std::lround(b.r * 255) ||
            std::lround(a.g * 255) != std::lround(b.g * 255) ||
            std::lround(a.b * 255) != std::lround(b.b * 255) ||
@@ -228,7 +228,7 @@ static bool hasVisibleEffect(const Node& n) {
 }
 static bool nonSolidVisibleFill(const Node& n) {
     for (const auto& p : n.fills)
-        if (p.visible && p.type != figmalib::PaintType::Solid) return true;
+        if (p.visible && p.type != figo::PaintType::Solid) return true;
     return false;
 }
 static float cornerR(const Node& n) {
@@ -376,7 +376,7 @@ static bool parseFontMeta(const fs::path& path, std::string& family, int& weight
 // ===================== converter ============================================
 
 struct Converter {
-    figmalib::FigmaUI* ui = nullptr;
+    figo::FigmaUI* ui = nullptr;
     fs::path outDir, spritesDir;
 
     struct GSprite {
@@ -430,18 +430,18 @@ struct Converter {
             // SettingRow slot) can't be stretched into the canon's box without
             // overflow — such instances must stay separate variants.
             bool hasImg = false;
-            for (const auto& p : n.fills) if (p.visible && p.type == figmalib::PaintType::Image) { hasImg = true; break; }
+            for (const auto& p : n.fills) if (p.visible && p.type == figo::PaintType::Image) { hasImg = true; break; }
             if (!struct_) s += "#" + std::to_string((int)std::lround(n.width)) + "x" +
                                std::to_string((int)std::lround(n.height));
             else if (hasImg) s += "#" + std::to_string((int)std::lround(n.width) / 16) + "x" +
                                   std::to_string((int)std::lround(n.height) / 16);
             for (const auto& p : n.fills) {
                 if (!p.visible) continue;
-                if (p.type == figmalib::PaintType::Solid) {
+                if (p.type == figo::PaintType::Solid) {
                     if (struct_) s += "s";
                     else { char c[10]; std::snprintf(c, sizeof(c), "s%02x%02x%02x",
                         (int)(p.color.r * 255), (int)(p.color.g * 255), (int)(p.color.b * 255)); s += c; }
-                } else if (p.type == figmalib::PaintType::Image) s += struct_ ? "i" : "i" + p.imageRef;
+                } else if (p.type == figo::PaintType::Image) s += struct_ ? "i" : "i" + p.imageRef;
                 else s += "g";
             }
             if (!n.strokes.empty()) s += "k";
@@ -477,7 +477,7 @@ struct Converter {
     // First visible image-fill ref of a node (empty if none).
     static std::string imageRefOf(const Node& n) {
         for (const auto& p : n.fills)
-            if (p.visible && p.type == figmalib::PaintType::Image) return p.imageRef;
+            if (p.visible && p.type == figo::PaintType::Image) return p.imageRef;
         return "";
     }
 
@@ -607,7 +607,7 @@ struct Converter {
         Baked out;
         ui->setViewport(curW * scale, curH * scale);
 
-        auto clone = figmalib::cloneNode(n, nullptr);
+        auto clone = figo::cloneNode(n, nullptr);
         if (!flatten) clone->children.clear();
         clone->opacity = 1.0f;
         clone->runtimeOpacity = -1.0f;
@@ -723,7 +723,7 @@ struct Converter {
     }
 
     // ---- anchors / responsive placement ----
-    static void axis(float pos, float size, figmalib::Constraint c, float parent,
+    static void axis(float pos, float size, figo::Constraint c, float parent,
                      float& a0, float& a1, float& o0, float& o1) {
         if (parent <= 0) {
             a0 = a1 = 0;
@@ -732,22 +732,22 @@ struct Converter {
             return;
         }
         switch (c) {
-            case figmalib::Constraint::Max:
+            case figo::Constraint::Max:
                 a0 = 1; a1 = 1; o0 = pos - parent; o1 = pos + size - parent; break;
-            case figmalib::Constraint::Stretch:
+            case figo::Constraint::Stretch:
                 a0 = 0; a1 = 1; o0 = pos; o1 = pos + size - parent; break;
-            case figmalib::Constraint::Center:
+            case figo::Constraint::Center:
                 a0 = 0.5f; a1 = 0.5f; o0 = pos - parent / 2; o1 = pos + size - parent / 2; break;
-            case figmalib::Constraint::Scale:
+            case figo::Constraint::Scale:
                 a0 = pos / parent; a1 = (pos + size) / parent; o0 = 0; o1 = 0; break;
-            case figmalib::Constraint::Min:
+            case figo::Constraint::Min:
             default:
                 a0 = 0; a1 = 0; o0 = pos; o1 = pos + size; break;
         }
     }
 
-    void place(float x, float y, float w, float h, figmalib::Constraint ch,
-               figmalib::Constraint cv, float pw, float ph) {
+    void place(float x, float y, float w, float h, figo::Constraint ch,
+               figo::Constraint cv, float pw, float ph) {
         float al, ar, ol, orr, at, ab, ot, ob;
         axis(x, w, ch, pw, al, ar, ol, orr);
         axis(y, h, cv, ph, at, ab, ot, ob);
@@ -809,15 +809,15 @@ struct Converter {
             body += "theme_override_colors/font_color = " + paintLit(*f) + "\n";
         int ha = 0;
         switch (n.textStyle.alignH) {
-            case figmalib::TextStyle::AlignH::Center: ha = 1; break;
-            case figmalib::TextStyle::AlignH::Right: ha = 2; break;
-            case figmalib::TextStyle::AlignH::Justified: ha = 3; break;
+            case figo::TextStyle::AlignH::Center: ha = 1; break;
+            case figo::TextStyle::AlignH::Right: ha = 2; break;
+            case figo::TextStyle::AlignH::Justified: ha = 3; break;
             default: break;
         }
         int va = 0;
         switch (n.textStyle.alignV) {
-            case figmalib::TextStyle::AlignV::Center: va = 1; break;
-            case figmalib::TextStyle::AlignV::Bottom: va = 2; break;
+            case figo::TextStyle::AlignV::Center: va = 1; break;
+            case figo::TextStyle::AlignV::Bottom: va = 2; break;
             default: break;
         }
         if (ha) body += "horizontal_alignment = " + std::to_string(ha) + "\n";
@@ -826,7 +826,7 @@ struct Converter {
         // Only turn on wrapping when the box is clearly tall enough for more
         // than one line — Godot DROPS a wrapped line entirely when the single
         // line is taller than the control's box (a font-18 heading in a 20px
-        // box), whereas figmalib just lets it overflow. So a single-line box
+        // box), whereas figo just lets it overflow. So a single-line box
         // (most headings/labels) stays autowrap-off and renders normally.
         const std::string& ar = n.textStyle.autoResize;
         const bool truncate = n.textStyle.truncateEnding || ar == "TRUNCATE";
@@ -985,7 +985,7 @@ struct Converter {
     }
 
     // Plain solid background for a container: a full-rect ColorRect child.
-    void emitColorBg(const figmalib::Paint* f, const std::string& parentAttr) {
+    void emitColorBg(const figo::Paint* f, const std::string& parentAttr) {
         if (!f) return;
         header("__bg", "ColorRect", parentAttr);
         placeFull();
@@ -1202,7 +1202,7 @@ static void writeProjectGodot(const fs::path& outDir, uint32_t baseW, uint32_t b
     if (fs::exists(p)) return;
     std::ofstream f(p, std::ios::binary);
     f << "config_version=5\n\n[application]\n\n"
-         "config/name=\"fapp2godot export\"\n"
+         "config/name=\"figo2godot export\"\n"
          "config/features=PackedStringArray(\"4.6\", \"Forward Plus\")\n\n"
          "[display]\n\n"
          "window/size/viewport_width=" << baseW << "\n"
@@ -1238,7 +1238,7 @@ static std::vector<FontEntry> loadFonts(const fs::path& fontsSrc, const fs::path
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::printf("usage: fapp2godot <input> [outDir] [--frame NAME] [--fonts DIR] [--scale N]\n");
+        std::printf("usage: figo2godot <input> [outDir] [--frame NAME] [--fonts DIR] [--scale N]\n");
         return 2;
     }
     const std::string input = argv[1];
@@ -1276,9 +1276,9 @@ int main(int argc, char** argv) {
     }
 
     std::printf("loading %s\n", input.c_str());
-    std::unique_ptr<figmalib::FigmaUI> ui;
+    std::unique_ptr<figo::FigmaUI> ui;
     try {
-        ui = figmalib::FigmaUI::fromFile(input);
+        ui = figo::FigmaUI::fromFile(input);
     } catch (const std::exception& ex) {
         std::fprintf(stderr, "FAIL: load: %s\n", ex.what());
         return 1;

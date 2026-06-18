@@ -1,8 +1,8 @@
-#include "figmalib/document.h"
+#include "figo/document.h"
 
 #include <algorithm>
 
-namespace figmalib {
+namespace figo {
 
 void Node::contentExtent(float& w, float& h) const {
     w = 0;
@@ -120,4 +120,4 @@ void Document::captureBaseLayout() {
     });
 }
 
-}  // namespace figmalib
+}  // namespace figo

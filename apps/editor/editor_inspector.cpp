@@ -45,7 +45,7 @@ void setNodeSize(Node& n, float w, float h) {
     }
 }
 
-std::string colorToHex(const figmalib::Color& c) {
+std::string colorToHex(const figo::Color& c) {
     char buf[8];
     std::snprintf(buf, sizeof(buf), "%02X%02X%02X",
                   static_cast<int>(std::lround(c.r * 255)),
@@ -54,7 +54,7 @@ std::string colorToHex(const figmalib::Color& c) {
     return buf;
 }
 
-bool hexToColor(const char* s, figmalib::Color& out) {
+bool hexToColor(const char* s, figo::Color& out) {
     if (*s == '#') ++s;
     if (std::strlen(s) != 6) return false;
     auto nib = [](char ch) -> int {
@@ -74,7 +74,7 @@ bool hexToColor(const char* s, figmalib::Color& out) {
     return true;
 }
 
-::Color toRl(const figmalib::Color& c) {
+::Color toRl(const figo::Color& c) {
     return {static_cast<unsigned char>(c.r * 255), static_cast<unsigned char>(c.g * 255),
             static_cast<unsigned char>(c.b * 255), 255};
 }
@@ -578,19 +578,19 @@ void drawInspector(EditorState& ed) {
                             ui(20), ui(20)},
                            "+")) {
             commitEdit(ed, n, [&](Node& node) {
-                figmalib::Paint p;
-                p.type = figmalib::PaintType::Solid;
+                figo::Paint p;
+                p.type = figo::PaintType::Solid;
                 p.color = {0.8f, 0.8f, 0.8f, 1.0f};
                 (sectionId == 0 ? node.fills : node.strokes).push_back(p);
             });
         }
         auto& paints = sectionId == 0 ? n->fills : n->strokes;
         for (size_t i = 0; i < paints.size(); ++i) {
-            figmalib::Paint& p = paints[i];
+            figo::Paint& p = paints[i];
             const int rowId = 200 + sectionId * 60 + static_cast<int>(i) * 3;
 
-            if (p.type != figmalib::PaintType::Solid) {
-                uiText(p.type == figmalib::PaintType::Image ? "Image" : "Gradient", fx,
+            if (p.type != figo::PaintType::Solid) {
+                uiText(p.type == figo::PaintType::Image ? "Image" : "Gradient", fx,
                        y + ui(4), fontS(), kTextDim);
                 if (GuiLabelButton({fx + ui(168), y, ui(20), ui(24)},
                                    p.visible ? "o" : "-")) {
@@ -623,7 +623,7 @@ void drawInspector(EditorState& ed) {
             if (GuiTextBox({fx + ui(28), y, ui(76), ui(24)}, hx.buf, sizeof(hx.buf),
                            hx.edit)) {
                 if (hx.edit) {
-                    figmalib::Color c = p.color;
+                    figo::Color c = p.color;
                     if (hexToColor(hx.buf, c)) {
                         commitEdit(ed, n, [&](Node& node) {
                             auto& list = sectionId == 0 ? node.fills : node.strokes;
@@ -679,7 +679,7 @@ void drawInspector(EditorState& ed) {
                     pickerDragging = true;
                     pickerBefore = {NodeProps::capture(n)};
                 }
-                const figmalib::Color nc{c.r / 255.0f, c.g / 255.0f, c.b / 255.0f,
+                const figo::Color nc{c.r / 255.0f, c.g / 255.0f, c.b / 255.0f,
                                          p.color.a};
                 if (pickerDragging &&
                     (nc.r != p.color.r || nc.g != p.color.g || nc.b != p.color.b)) {
@@ -710,23 +710,23 @@ void drawInspector(EditorState& ed) {
         wOpts.minV = 0;
         simpleField(300, {fx + ui(52), y, ui(52), ui(26)}, nullptr, n->strokeWeight, wOpts,
                     [&](float v) { n->strokeWeight = std::max(0.0f, v); });
-        int alignIdx = n->strokeAlign == figmalib::StrokeAlign::Inside   ? 0
-                       : n->strokeAlign == figmalib::StrokeAlign::Center ? 1
+        int alignIdx = n->strokeAlign == figo::StrokeAlign::Inside   ? 0
+                       : n->strokeAlign == figo::StrokeAlign::Center ? 1
                                                                          : 2;
         const int prev = alignIdx;
         GuiComboBox({fx + ui(112), y, ui(100), ui(26)}, "Inside;Center;Outside", &alignIdx);
         if (alignIdx != prev) {
             commitEdit(ed, n, [&](Node& node) {
-                node.strokeAlign = alignIdx == 0   ? figmalib::StrokeAlign::Inside
-                                   : alignIdx == 1 ? figmalib::StrokeAlign::Center
-                                                   : figmalib::StrokeAlign::Outside;
+                node.strokeAlign = alignIdx == 0   ? figo::StrokeAlign::Inside
+                                   : alignIdx == 1 ? figo::StrokeAlign::Center
+                                                   : figo::StrokeAlign::Outside;
             });
         }
         y += ui(34);
     }
 
     // ---- Text ----
-    if (n->type == figmalib::NodeType::Text) {
+    if (n->type == figo::NodeType::Text) {
         sectionHeader(fx, y, "Text");
         uiText("Size", fx, y + ui(6), fontS(), kTextDim);
         NumFieldOpts tOpts;
@@ -735,8 +735,8 @@ void drawInspector(EditorState& ed) {
                     tOpts, [&](float v) { n->textStyle.fontSize = std::max(1.0f, v); });
         y += ui(32);
 
-        using AH = figmalib::TextStyle::AlignH;
-        using AV = figmalib::TextStyle::AlignV;
+        using AH = figo::TextStyle::AlignH;
+        using AV = figo::TextStyle::AlignV;
         const char* hLabels[3] = {"L", "C", "R"};
         const AH hVals[3] = {AH::Left, AH::Center, AH::Right};
         const char* vLabels[3] = {"T", "M", "B"};
@@ -786,11 +786,11 @@ void drawInspector(EditorState& ed) {
     if (!n->effects.empty()) {
         sectionHeader(fx, y, "Effects");
         for (size_t i = 0; i < n->effects.size(); ++i) {
-            const figmalib::Effect& fxE = n->effects[i];
+            const figo::Effect& fxE = n->effects[i];
             const char* name =
-                fxE.type == figmalib::Effect::Type::DropShadow    ? "Drop shadow"
-                : fxE.type == figmalib::Effect::Type::InnerShadow ? "Inner shadow"
-                : fxE.type == figmalib::Effect::Type::LayerBlur   ? "Layer blur"
+                fxE.type == figo::Effect::Type::DropShadow    ? "Drop shadow"
+                : fxE.type == figo::Effect::Type::InnerShadow ? "Inner shadow"
+                : fxE.type == figo::Effect::Type::LayerBlur   ? "Layer blur"
                                                                   : "Background blur";
             uiText(name, fx, y + ui(3), fontS(), kTextCol);
             if (GuiLabelButton({fx + ui(168), y, ui(20), ui(22)},

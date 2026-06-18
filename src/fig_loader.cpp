@@ -13,13 +13,13 @@
 
 #include <nlohmann/json.hpp>
 
-#include "figmalib/parser.h"
+#include "figo/parser.h"
 
-#ifndef FIGMALIB_FIG2JSON_DEFAULT
-#define FIGMALIB_FIG2JSON_DEFAULT "fig2json"
+#ifndef FIGO_FIG2JSON_DEFAULT
+#define FIGO_FIG2JSON_DEFAULT "fig2json"
 #endif
 
-#ifdef FIGMALIB_HAVE_FIG2JSON_LIB
+#ifdef FIGO_HAVE_FIG2JSON_LIB
 // In-process conversion via the fig2json static library (src/capi.rs).
 extern "C" {
 char* fig2json_convert_file(const char* figPath, const char* outDir, char** err);
@@ -27,7 +27,7 @@ void fig2json_free(char* s);
 }
 #endif
 
-namespace figmalib {
+namespace figo {
 
 namespace fs = std::filesystem;
 
@@ -35,7 +35,7 @@ namespace {
 
 std::string readFile(const fs::path& path) {
     std::ifstream f(path, std::ios::binary);
-    if (!f) throw std::runtime_error("figmalib: cannot open file: " + path.string());
+    if (!f) throw std::runtime_error("figo: cannot open file: " + path.string());
     std::ostringstream ss;
     ss << f.rdbuf();
     return ss.str();
@@ -49,8 +49,8 @@ std::string lowerExt(const fs::path& p) {
 
 // fig2json discovery: env override → compile-time default → bare name (PATH).
 std::string fig2jsonExe() {
-    if (const char* env = std::getenv("FIGMALIB_FIG2JSON"); env && *env) return env;
-    const fs::path def = FIGMALIB_FIG2JSON_DEFAULT;
+    if (const char* env = std::getenv("FIGO_FIG2JSON"); env && *env) return env;
+    const fs::path def = FIGO_FIG2JSON_DEFAULT;
     std::error_code ec;
     if (def.is_absolute() && fs::exists(def, ec)) return def.string();
     return "fig2json";
@@ -79,7 +79,7 @@ fs::path convertFig(const fs::path& figPath) {
 
     fs::create_directories(outDir, ec);
 
-#ifdef FIGMALIB_HAVE_FIG2JSON_LIB
+#ifdef FIGO_HAVE_FIG2JSON_LIB
     // In-process conversion: writes canvas.json + images/ into outDir, same
     // layout as the CLI. Falls through to the CLI only on failure.
     {
@@ -102,8 +102,8 @@ fs::path convertFig(const fs::path& figPath) {
     const int rc = std::system(cmd.c_str());
     if (rc != 0 || !fs::exists(canvasJson)) {
         throw std::runtime_error(
-            "figmalib: fig2json conversion failed (exit " + std::to_string(rc) +
-            "). Set FIGMALIB_FIG2JSON to the fig2json executable, or pre-convert with: "
+            "figo: fig2json conversion failed (exit " + std::to_string(rc) +
+            "). Set FIGO_FIG2JSON to the fig2json executable, or pre-convert with: "
             "fig2json \"" + figPath.string() + "\" \"" + outDir.string() + "\"");
     }
     return outDir;
@@ -146,4 +146,4 @@ LoadedFile loadFigmaFile(const std::string& path) {
     return result;
 }
 
-}  // namespace figmalib
+}  // namespace figo

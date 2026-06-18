@@ -8,7 +8,7 @@
 
 #include <string>
 
-namespace figmalib {
+namespace figo {
 
 class FontProvider {
 public:
@@ -42,4 +42,4 @@ private:
     Impl* impl_;
 };
 
-}  // namespace figmalib
+}  // namespace figo

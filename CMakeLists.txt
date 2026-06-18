@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
-project(figmalib LANGUAGES CXX)
+project(figo LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(FIGMALIB_BACKEND_RAYLIB "Build the raylib backend" ON)
-option(FIGMALIB_BUILD_EXAMPLES "Build example apps" ON)
-option(FIGMALIB_SCRIPTING "Build the QuickJS scripting host (figmalib_script)" ON)
+option(FIGO_BACKEND_RAYLIB "Build the raylib backend" ON)
+option(FIGO_BUILD_EXAMPLES "Build example apps" ON)
+option(FIGO_SCRIPTING "Build the QuickJS scripting host (figo_script)" ON)
 
 # ThorVG: prebuilt static library (meson: --default-library=static -Dstatic=true).
 # Prefer a CPU+GL build (engines=cpu,gl) when present — enables the zero-copy
@@ -56,18 +56,18 @@ endif()
 
 # Desktop-only pieces: tests, demos, the editor, .fig conversion.
 if(EMSCRIPTEN OR ANDROID)
-    set(FIGMALIB_DESKTOP OFF)
+    set(FIGO_DESKTOP OFF)
 else()
-    set(FIGMALIB_DESKTOP ON)
+    set(FIGO_DESKTOP ON)
 endif()
 
 # ---- core library ----
 # fig2json CLI used to convert .fig files at load time (override at runtime
-# with the FIGMALIB_FIG2JSON environment variable).
-set(FIGMALIB_FIG2JSON "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.exe"
+# with the FIGO_FIG2JSON environment variable).
+set(FIGO_FIG2JSON "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.exe"
     CACHE FILEPATH "Path to the fig2json executable")
 
-add_library(figmalib STATIC
+add_library(figo STATIC
     src/document.cpp
     src/parser.cpp
     src/canvas_parser.cpp
@@ -80,36 +80,36 @@ add_library(figmalib STATIC
     src/renderer.cpp
     src/ui.cpp
 )
-target_compile_definitions(figmalib PRIVATE
-    FIGMALIB_FIG2JSON_DEFAULT="${FIGMALIB_FIG2JSON}")
+target_compile_definitions(figo PRIVATE
+    FIGO_FIG2JSON_DEFAULT="${FIGO_FIG2JSON}")
 
 # fig2json as a static library → in-process .fig conversion (no subprocess).
 # Build it with: cargo build --release (crate-type staticlib). When absent,
 # loading falls back to the fig2json CLI.
-set(FIGMALIB_FIG2JSON_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.lib"
+set(FIGO_FIG2JSON_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.lib"
     CACHE FILEPATH "Path to the fig2json static library (empty/missing → CLI fallback)")
-if(EXISTS "${FIGMALIB_FIG2JSON_LIB}" AND WIN32)  # a Windows static lib
-    target_compile_definitions(figmalib PRIVATE FIGMALIB_HAVE_FIG2JSON_LIB)
-    target_link_libraries(figmalib PUBLIC "${FIGMALIB_FIG2JSON_LIB}")
+if(EXISTS "${FIGO_FIG2JSON_LIB}" AND WIN32)  # a Windows static lib
+    target_compile_definitions(figo PRIVATE FIGO_HAVE_FIG2JSON_LIB)
+    target_link_libraries(figo PUBLIC "${FIGO_FIG2JSON_LIB}")
     if(WIN32)
         # Rust std dependencies.
-        target_link_libraries(figmalib PUBLIC ws2_32 userenv ntdll bcrypt advapi32)
+        target_link_libraries(figo PUBLIC ws2_32 userenv ntdll bcrypt advapi32)
     endif()
 endif()
-target_include_directories(figmalib
+target_include_directories(figo
     PUBLIC include "${THORVG_INCLUDE_DIR}"
     PRIVATE src third_party
 )
-target_compile_definitions(figmalib PUBLIC TVG_STATIC)
-target_link_libraries(figmalib PUBLIC "${THORVG_LIBRARY}")
+target_compile_definitions(figo PUBLIC TVG_STATIC)
+target_link_libraries(figo PUBLIC "${THORVG_LIBRARY}")
 if(WIN32)
-    target_link_libraries(figmalib PRIVATE advapi32)  # font registry lookup
+    target_link_libraries(figo PRIVATE advapi32)  # font registry lookup
 endif()
 
 # ---- scripting host (QuickJS) ----
-# App logic becomes <design.fig> + <logic.js>: figmalib::ScriptHost binds the
-# FigmaUI API into a QuickJS context (see include/figmalib/script.h).
-if(FIGMALIB_SCRIPTING)
+# App logic becomes <design.fig> + <logic.js>: figo::ScriptHost binds the
+# FigmaUI API into a QuickJS context (see include/figo/script.h).
+if(FIGO_SCRIPTING)
     include(FetchContent)
     set(BUILD_QJS_LIBC OFF CACHE BOOL "" FORCE)         # we bind our own API
     set(QJS_BUILD_LIBC OFF CACHE BOOL "" FORCE)
@@ -120,16 +120,16 @@ if(FIGMALIB_SCRIPTING)
     )
     FetchContent_MakeAvailable(quickjs)
 
-    add_library(figmalib_script STATIC src/script_host.cpp)
-    target_include_directories(figmalib_script PRIVATE third_party)  # nlohmann
-    target_link_libraries(figmalib_script PUBLIC figmalib qjs)
+    add_library(figo_script STATIC src/script_host.cpp)
+    target_include_directories(figo_script PRIVATE third_party)  # nlohmann
+    target_link_libraries(figo_script PUBLIC figo qjs)
     if(WIN32)
-        target_link_libraries(figmalib_script PRIVATE winhttp)  # fetch()
+        target_link_libraries(figo_script PRIVATE winhttp)  # fetch()
     endif()
 endif()
 
 # ---- raylib backend ----
-if(FIGMALIB_BACKEND_RAYLIB)
+if(FIGO_BACKEND_RAYLIB)
     include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
@@ -143,42 +143,42 @@ if(FIGMALIB_BACKEND_RAYLIB)
     )
     FetchContent_MakeAvailable(raylib)
 
-    add_library(figmalib_raylib STATIC backends/raylib/figmalib_raylib.cpp)
-    target_include_directories(figmalib_raylib PUBLIC backends/raylib)
-    target_link_libraries(figmalib_raylib PUBLIC figmalib raylib)
+    add_library(figo_raylib STATIC backends/raylib/figo_raylib.cpp)
+    target_include_directories(figo_raylib PUBLIC backends/raylib)
+    target_link_libraries(figo_raylib PUBLIC figo raylib)
 endif()
 
 # ---- examples ----
-if(FIGMALIB_BUILD_EXAMPLES AND FIGMALIB_BACKEND_RAYLIB AND FIGMALIB_DESKTOP)
+if(FIGO_BUILD_EXAMPLES AND FIGO_BACKEND_RAYLIB AND FIGO_DESKTOP)
     add_executable(demo_raylib examples/demo_raylib/main.cpp)
-    target_link_libraries(demo_raylib PRIVATE figmalib_raylib)
+    target_link_libraries(demo_raylib PRIVATE figo_raylib)
     target_compile_definitions(demo_raylib PRIVATE
         ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples/assets")
 
     add_executable(demo_wallet examples/demo_wallet/main.cpp)
-    target_link_libraries(demo_wallet PRIVATE figmalib_raylib)
+    target_link_libraries(demo_wallet PRIVATE figo_raylib)
 endif()
 
 # ---- tests ----
-if(FIGMALIB_BUILD_EXAMPLES AND FIGMALIB_DESKTOP)
+if(FIGO_BUILD_EXAMPLES AND FIGO_DESKTOP)
     add_executable(render_test tests/render_test/main.cpp)
-    target_link_libraries(render_test PRIVATE figmalib)
+    target_link_libraries(render_test PRIVATE figo)
     target_compile_definitions(render_test PRIVATE
         ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples/assets")
 
     add_executable(layout_test tests/layout_test/main.cpp)
-    target_link_libraries(layout_test PRIVATE figmalib)
+    target_link_libraries(layout_test PRIVATE figo)
 endif()
 
-# ---- fapp2godot: design (.fig / canvas.json / REST) -> Godot .tscn ----
-if(FIGMALIB_DESKTOP)
-    add_executable(fapp2godot apps/fapp2godot/main.cpp)
-    target_link_libraries(fapp2godot PRIVATE figmalib)
-    target_include_directories(fapp2godot PRIVATE third_party)  # nlohmann (manifest, later)
+# ---- figo2godot: design (.fig / canvas.json / REST) -> Godot .tscn ----
+if(FIGO_DESKTOP)
+    add_executable(figo2godot apps/figo2godot/main.cpp)
+    target_link_libraries(figo2godot PRIVATE figo)
+    target_include_directories(figo2godot PRIVATE third_party)  # nlohmann (manifest, later)
 endif()
 
 # ---- figmaplay: the generic script player (an app = .fig + .js) ----
-if(FIGMALIB_SCRIPTING AND FIGMALIB_BACKEND_RAYLIB)
+if(FIGO_SCRIPTING AND FIGO_BACKEND_RAYLIB)
     if(ANDROID)
         # The NativeActivity loads libfigmaplay.so; keep the glue's entry
         # point alive (raylib only sets that flag in its own scope).
@@ -190,7 +190,7 @@ if(FIGMALIB_SCRIPTING AND FIGMALIB_BACKEND_RAYLIB)
     else()
         add_executable(figmaplay apps/figmaplay/main.cpp)
     endif()
-    target_link_libraries(figmaplay PRIVATE figmalib_raylib figmalib_script)
+    target_link_libraries(figmaplay PRIVATE figo_raylib figo_script)
     target_include_directories(figmaplay PRIVATE third_party)  # nlohmann (app.json)
     target_compile_definitions(figmaplay PRIVATE
         EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples")
@@ -206,36 +206,36 @@ if(FIGMALIB_SCRIPTING AND FIGMALIB_BACKEND_RAYLIB)
         # A packaged app (figmapack): a standard app dir preloaded at /app, which
         # the runtime prefers over the bundled wallet. The design must already be
         # canvas.json / REST json (figmapack converts .fig first).
-        set(FIGMALIB_WEB_APP_DIR "" CACHE PATH "Packaged app dir preloaded at /app")
-        if(FIGMALIB_WEB_APP_DIR)
+        set(FIGO_WEB_APP_DIR "" CACHE PATH "Packaged app dir preloaded at /app")
+        if(FIGO_WEB_APP_DIR)
             # SHELL: keeps each flag+arg pair intact (CMake de-dups bare flags)
             target_link_options(figmaplay PRIVATE
-                "SHELL:--preload-file ${FIGMALIB_WEB_APP_DIR}@/app")
+                "SHELL:--preload-file ${FIGO_WEB_APP_DIR}@/app")
         else()
             # Default: the bundled wallet demo. The design ships pre-converted
             # (canvas.json + images/) — .fig conversion is a native-only step.
-            set(FIGMALIB_WEB_DESIGN_DIR
+            set(FIGO_WEB_DESIGN_DIR
                 "${CMAKE_CURRENT_SOURCE_DIR}/../fig2psd/test/figma/wallet.fig.export"
                 CACHE PATH "Design dir (canvas.json + images) preloaded into the web FS")
             target_link_options(figmaplay PRIVATE
-                "SHELL:--preload-file ${FIGMALIB_WEB_DESIGN_DIR}@/assets/wallet"
+                "SHELL:--preload-file ${FIGO_WEB_DESIGN_DIR}@/assets/wallet"
                 "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/scripts/wallet.js@/scripts/wallet.js"
                 "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/assets/fonts@/fonts")
         endif()
     endif()
     if(WIN32 AND NOT EMSCRIPTEN AND NOT ANDROID)
         # figmapack sets this per app to embed the app's icon into figmaplay.exe.
-        set(FIGMALIB_WIN_ICON "" CACHE FILEPATH "A .ico embedded into figmaplay.exe")
-        if(FIGMALIB_WIN_ICON)
+        set(FIGO_WIN_ICON "" CACHE FILEPATH "A .ico embedded into figmaplay.exe")
+        if(FIGO_WIN_ICON)
             set(_figmaplay_rc "${CMAKE_CURRENT_BINARY_DIR}/figmaplay_icon.rc")
-            file(WRITE "${_figmaplay_rc}" "IDI_ICON1 ICON \"${FIGMALIB_WIN_ICON}\"\n")
+            file(WRITE "${_figmaplay_rc}" "IDI_ICON1 ICON \"${FIGO_WIN_ICON}\"\n")
             target_sources(figmaplay PRIVATE "${_figmaplay_rc}")
         endif()
     endif()
 endif()
 
 # ---- editor app ----
-if(FIGMALIB_BACKEND_RAYLIB AND FIGMALIB_DESKTOP)
+if(FIGO_BACKEND_RAYLIB AND FIGO_DESKTOP)
     FetchContent_Declare(raygui
         URL https://github.com/raysan5/raygui/archive/refs/tags/4.0.tar.gz
     )
@@ -254,7 +254,7 @@ if(FIGMALIB_BACKEND_RAYLIB AND FIGMALIB_DESKTOP)
     )
     target_include_directories(figmaedit PRIVATE
         "${raygui_SOURCE_DIR}/src" third_party backends/raylib)
-    target_link_libraries(figmaedit PRIVATE figmalib raylib)
+    target_link_libraries(figmaedit PRIVATE figo raylib)
     if(WIN32)
         target_link_libraries(figmaedit PRIVATE comdlg32 ws2_32)  # dialogs + MCP socket
     endif()

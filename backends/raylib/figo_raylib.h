@@ -1,5 +1,5 @@
 #pragma once
-// figmalib — raylib backend.
+// figo — raylib backend.
 //
 // Bridges a FigmaUI to raylib: uploads the rendered RGBA buffer into a
 // Texture2D and forwards mouse input. This file is the template for writing
@@ -8,9 +8,9 @@
 
 #include <raylib.h>
 
-#include <figmalib/ui.h>
+#include <figo/ui.h>
 
-namespace figmalib {
+namespace figo {
 
 class RaylibFigmaView {
 public:
@@ -38,7 +38,7 @@ public:
     // Draw the UI texture. Call between BeginDrawing/EndDrawing. During a
     // frame transition this composites the cached outgoing-frame texture with
     // the incoming one on the GPU (the vector scene is not re-rasterized).
-    // (::Color is raylib's — figmalib has its own Color type in this namespace.)
+    // (::Color is raylib's — figo has its own Color type in this namespace.)
     void draw(int x = 0, int y = 0, ::Color tint = {255, 255, 255, 255}) const;
 
     const Texture2D& texture() const { return gpuActive_ ? rt_.texture : texture_; }
@@ -64,4 +64,4 @@ private:
     float chromeY_ = 0;
 };
 
-}  // namespace figmalib
+}  // namespace figo
