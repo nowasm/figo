@@ -51,6 +51,43 @@ std::string showSaveFileDialog(const std::string& suggested) {
     return path;
 }
 
+#elif defined(__APPLE__)
+
+// macOS: no AppKit linkage in this TU — drive the native panels through
+// osascript (a real modal Finder chooser). Blocks like GetOpenFileName does.
+#include <cstdio>
+
+static std::string runOsascript(const std::string& script) {
+    const std::string cmd = "osascript -e '" + script + "' 2>/dev/null";
+    FILE* p = popen(cmd.c_str(), "r");
+    if (!p) return {};
+    std::string out;
+    char buf[1024];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), p)) > 0) out.append(buf, n);
+    pclose(p);  // nonzero (user cancelled) just yields empty out
+    while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) out.pop_back();
+    return out;
+}
+
+std::string showOpenFileDialog() {
+    // Filter to .fig / .json; cancel -> osascript errors -> empty string.
+    return runOsascript(
+        "POSIX path of (choose file with prompt \"Open Figma file\" "
+        "of type {\"fig\", \"json\"})");
+}
+
+std::string showSaveFileDialog(const std::string& suggested) {
+    std::string base = suggested;
+    if (auto pos = base.find_last_of('/'); pos != std::string::npos)
+        base = base.substr(pos + 1);
+    if (base.empty()) base = "design.json";
+    for (char& c : base) if (c == '\'' || c == '"') c = '_';  // keep AppleScript sane
+    return runOsascript(
+        "POSIX path of (choose file name with prompt \"Save as\" "
+        "default name \"" + base + "\")");
+}
+
 #else
 
 std::string showOpenFileDialog() { return {}; }

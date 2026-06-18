@@ -65,13 +65,25 @@ void collectCodepoints(const std::string& s, std::unordered_set<int>& out, bool&
 
 void loadUiFont(const std::vector<int>& codepoints, bool wantCjk) {
     // Semibold for Latin (seguisb), bold YaHei for CJK — the UI reads better
-    // a touch heavier at these sizes.
+    // a touch heavier at these sizes. raylib's LoadFontEx (stb_truetype) reads
+    // face 0 at file offset 0, so it can't open .ttc collections — use .ttf
+    // files on macOS (Arial Unicode covers Latin+CJK in one face).
+#ifdef __APPLE__
+    const char* candidates[] = {
+        wantCjk ? "/Library/Fonts/Arial Unicode.ttf"
+                : "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+    };
+#else
     const char* candidates[] = {
         wantCjk ? "C:/Windows/Fonts/msyhbd.ttc" : "C:/Windows/Fonts/seguisb.ttf",
         wantCjk ? "C:/Windows/Fonts/msyh.ttc" : "C:/Windows/Fonts/segoeui.ttf",
         wantCjk ? "C:/Windows/Fonts/simhei.ttf" : "C:/Windows/Fonts/arial.ttf",
         "C:/Windows/Fonts/segoeui.ttf",
     };
+#endif
     for (const char* path : candidates) {
         Font f = LoadFontEx(path, fontM(), const_cast<int*>(codepoints.data()),
                             static_cast<int>(codepoints.size()));

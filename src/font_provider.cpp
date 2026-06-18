@@ -100,7 +100,9 @@ std::vector<SystemFont> enumerateSystemFonts() {
     RegCloseKey(key);
     return fonts;
 }
-#else
+#elif !defined(__APPLE__)
+// Linux/other: no enumeration — apps should bundle fonts. (macOS impl below,
+// after the sfnt readers it depends on.)
 std::vector<SystemFont> enumerateSystemFonts() { return {}; }
 #endif
 
@@ -111,6 +113,7 @@ std::vector<SystemFont> enumerateSystemFonts() { return {}; }
 
 struct SfntInfo {
     std::string family;
+    std::string subfamily;  // nameID 2 / 17 — style word ("Bold", "Italic", …)
     int weight = 400;
     bool italic = false;
 };
@@ -151,14 +154,14 @@ bool parseSfnt(const std::vector<uint8_t>& d, SfntInfo& out, uint32_t dirOff = 0
     const uint8_t* nt = d.data() + nameOff;
     const uint16_t count = be16(nt + 2);
     const uint16_t strOff = be16(nt + 4);
-    std::string family1, family16;
+    std::string family1, family16, subfam2, subfam17;
     for (uint16_t i = 0; i < count; ++i) {
         const uint8_t* rec = nt + 6 + i * 12;
         if (rec + 12 > d.data() + nameOff + nameLen) break;
         const uint16_t platform = be16(rec), encoding = be16(rec + 2);
         const uint16_t nameId = be16(rec + 6);
         const uint16_t len = be16(rec + 8), off = be16(rec + 10);
-        if (nameId != 1 && nameId != 16) continue;
+        if (nameId != 1 && nameId != 16 && nameId != 2 && nameId != 17) continue;
         const uint8_t* s = nt + strOff + off;
         if (s + len > d.data() + nameOff + nameLen) continue;
         std::string value;
@@ -176,8 +179,11 @@ bool parseSfnt(const std::vector<uint8_t>& d, SfntInfo& out, uint32_t dirOff = 0
         if (value.empty()) continue;
         if (nameId == 16 && family16.empty()) family16 = value;
         if (nameId == 1 && family1.empty()) family1 = value;
+        if (nameId == 17 && subfam17.empty()) subfam17 = value;
+        if (nameId == 2 && subfam2.empty()) subfam2 = value;
     }
     out.family = !family16.empty() ? family16 : family1;
+    out.subfamily = !subfam17.empty() ? subfam17 : subfam2;
     return !out.family.empty();
 }
 
@@ -300,6 +306,58 @@ std::vector<uint8_t> extractTtcFace(const std::vector<uint8_t>& d, const std::st
     return haveAny ? repackFace(d, chosen) : std::vector<uint8_t>();
 }
 
+#ifdef __APPLE__
+// macOS has no font registry; scan the standard font dirs and read each file's
+// sfnt name table (handling .ttc collections) so findSystemPath can resolve
+// "Helvetica", "Arial Unicode MS", "PingFang SC", etc. — mirroring the Windows
+// registry path. system() caches the result, so this directory walk runs once.
+std::vector<SystemFont> enumerateSystemFonts() {
+    namespace fs = std::filesystem;
+    std::vector<SystemFont> fonts;
+    std::vector<std::string> dirs = {
+        "/System/Library/Fonts", "/System/Library/Fonts/Supplemental", "/Library/Fonts"};
+    if (const char* home = std::getenv("HOME"))
+        dirs.push_back(std::string(home) + "/Library/Fonts");
+
+    auto add = [&](const SfntInfo& info, const std::string& path) {
+        if (info.family.empty()) return;
+        const std::string sub = toLower(info.subfamily);
+        const bool regularish =
+            sub.empty() || sub == "regular" || sub == "book" || sub == "roman";
+        // "helvetica" for the regular face, "helvetica bold" for styled faces —
+        // matching findSystemPath's "<family> <style>" candidate strings.
+        fonts.push_back({toLower(info.family) + (regularish ? "" : " " + sub), path});
+    };
+
+    for (const auto& dir : dirs) {
+        std::error_code ec;
+        if (!fs::is_directory(dir, ec)) continue;
+        for (fs::directory_iterator it(dir, ec), end; it != end && !ec; it.increment(ec)) {
+            const fs::path p = it->path();
+            const std::string ext = toLower(p.extension().string());
+            if (ext != ".ttf" && ext != ".otf" && ext != ".ttc") continue;
+            std::ifstream f(p, std::ios::binary);
+            if (!f) continue;
+            std::vector<uint8_t> d((std::istreambuf_iterator<char>(f)),
+                                   std::istreambuf_iterator<char>());
+            if (d.size() < 12) continue;
+            if (be32(d.data()) == 0x74746366 /*ttcf*/) {  // collection: one entry per face
+                const uint32_t numFonts = std::min<uint32_t>(be32(d.data() + 8), 64);
+                for (uint32_t i = 0; i < numFonts; ++i) {
+                    if (12 + (i + 1) * 4u > d.size()) break;
+                    SfntInfo info;
+                    if (parseSfnt(d, info, be32(d.data() + 12 + i * 4))) add(info, p.string());
+                }
+            } else {
+                SfntInfo info;
+                if (parseSfnt(d, info)) add(info, p.string());
+            }
+        }
+    }
+    return fonts;
+}
+#endif
+
 }  // namespace
 
 struct FontProvider::Impl {
@@ -311,7 +369,12 @@ struct FontProvider::Impl {
     std::unordered_map<std::string, bool> loaded;
     // composite key → sorted cmap coverage ranges
     std::unordered_map<std::string, std::vector<std::pair<uint32_t, uint32_t>>> coverage;
-    std::string defaultFamily = "Segoe UI";
+    std::string defaultFamily =
+#ifdef __APPLE__
+        "Helvetica";
+#else
+        "Segoe UI";
+#endif
     std::string lastGoodKey;
 
     static std::string composite(const std::string& family, int weight, bool italic) {
@@ -471,11 +534,17 @@ bool FontProvider::hasGlyph(const std::string& fontKey, unsigned long codepoint)
 }
 
 std::string FontProvider::fallbackFontFor(unsigned long codepoint, int weight, bool italic) {
-    // Common Windows families with broad CJK / symbol coverage. fontKeyFor
-    // itself may resolve to the default family — hasGlyph filters those out.
-    static const char* candidates[] = {"Microsoft YaHei", "SimHei",          "SimSun",
-                                       "Malgun Gothic",   "Yu Gothic UI",    "MS Gothic",
-                                       "Segoe UI Symbol", "Segoe UI Emoji"};
+    // Families with broad CJK / symbol coverage. fontKeyFor itself may resolve
+    // to the default family — hasGlyph filters those out. Platform-ordered so the
+    // locally-present families are tried first.
+    static const char* candidates[] = {
+#ifdef __APPLE__
+        "PingFang SC",    "PingFang TC",     "Hiragino Sans GB", "Hiragino Sans",
+        "Heiti SC",       "Arial Unicode MS", "Apple Color Emoji", "Apple Symbols",
+#endif
+        "Microsoft YaHei", "SimHei",          "SimSun",
+        "Malgun Gothic",   "Yu Gothic UI",    "MS Gothic",
+        "Segoe UI Symbol", "Segoe UI Emoji"};
     for (const char* fam : candidates) {
         const std::string key = fontKeyFor(fam, weight, italic);
         if (!key.empty() && hasGlyph(key, codepoint)) return key;

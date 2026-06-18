@@ -18,6 +18,7 @@ static constexpr SockT kBadSock = INVALID_SOCKET;
 static void closeSock(SockT s) { closesocket(s); }
 #else
 #include <arpa/inet.h>
+#include <csignal>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -152,6 +153,11 @@ bool serverStart(int port, HttpHandler handler) {
 #ifdef _WIN32
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
+#else
+    // Writing to a socket the client already closed raises SIGPIPE on macOS/BSD
+    // (default action: terminate the process). The editor must survive a client
+    // that disconnects mid-response, so ignore it process-wide.
+    std::signal(SIGPIPE, SIG_IGN);
 #endif
     gListen = ::socket(AF_INET, SOCK_STREAM, 0);
     if (gListen == kBadSock) return false;
