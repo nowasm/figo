@@ -531,7 +531,69 @@ struct Converter {
         uint64_t hash = 0;
         float x = 0, y = 0;  // frame-absolute top-left of painted region (logical)
         int w = 0, h = 0;    // logical size (native px / scale)
+        bool nine = false;   // texture was shrunk to a 9-slice
+        int ml = 0, mr = 0, mt = 0, mb = 0;  // 9-slice patch margins (logical px)
     };
+
+    // Collapse a 9-sliceable image: find the longest run of identical adjacent
+    // columns (and rows) — the stretchable middle — and shrink it to 1px, leaving
+    // the corners/edges intact. Sets the patch margins and rewrites px/w/h in
+    // place. Returns false when there's no worthwhile run (keep the full bake).
+    // This catches clip-path cut-corner panels (uniform fill, only the corners
+    // differ) that carry no Figma cornerRadius, so many same-style different-size
+    // panels collapse to ONE tiny shared texture.
+    static bool nineShrink(std::vector<uint32_t>& px, int& w, int& h, int scale,
+                           int& ml, int& mr, int& mt, int& mb) {
+        if (w < 2 * scale + 1 && h < 2 * scale + 1) return false;
+        auto colEq = [&](int a, int b) {
+            for (int y = 0; y < h; ++y) if (px[(size_t)y * w + a] != px[(size_t)y * w + b]) return false;
+            return true;
+        };
+        auto rowEq = [&](int a, int b) {
+            for (int x = 0; x < w; ++x) if (px[(size_t)a * w + x] != px[(size_t)b * w + x]) return false;
+            return true;
+        };
+        // longest run of consecutive equal columns -> [cs, ce] (native/2x px)
+        int cs = 0, ce = 0, s = 0;
+        for (int x = 1; x < w; ++x) {
+            if (colEq(x, x - 1)) { if (x - s > ce - cs) { cs = s; ce = x; } }
+            else s = x;
+        }
+        int rs = 0, re = 0; s = 0;
+        for (int y = 1; y < h; ++y) {
+            if (rowEq(y, y - 1)) { if (y - s > re - rs) { rs = s; re = y; } }
+            else s = y;
+        }
+        // Collapse the stretchable middle only if it saves at least one supersample
+        // block per axis (so the texture genuinely shrinks after downsampling).
+        const bool cw9 = ce - cs >= scale, ch9 = re - rs >= scale;
+        if (!cw9 && !ch9) return false;
+        // 2x margins -> logical (snap the corner extents down to whole blocks).
+        ml = cs / scale; mr = (w - 1 - ce) / scale; mt = rs / scale; mb = (h - 1 - re) / scale;
+        const int nw = ml + 1 + mr, nh = mt + 1 + mb;
+        // Downsample (box-average each scale×scale block); the 1px middle samples
+        // the run's first native row/col (the run is uniform, so any is equal).
+        std::vector<uint32_t> out((size_t)nw * nh);
+        auto srcX = [&](int ox) { return ox < ml ? ox * scale : (ox == ml ? cs : ce + 1 + (ox - ml - 1) * scale); };
+        auto srcY = [&](int oy) { return oy < mt ? oy * scale : (oy == mt ? rs : re + 1 + (oy - mt - 1) * scale); };
+        const int blk = scale;
+        for (int oy = 0; oy < nh; ++oy) {
+            const int sy = srcY(oy), bh = (oy == mt) ? 1 : blk;
+            for (int ox = 0; ox < nw; ++ox) {
+                const int sx = srcX(ox), bw2 = (ox == ml) ? 1 : blk;
+                uint32_t r = 0, g = 0, b = 0, a = 0; int cnt = 0;
+                for (int yy = 0; yy < bh && sy + yy < h; ++yy)
+                    for (int xx = 0; xx < bw2 && sx + xx < w; ++xx) {
+                        uint32_t p = px[(size_t)(sy + yy) * w + sx + xx];
+                        r += p & 0xff; g += (p >> 8) & 0xff; b += (p >> 16) & 0xff; a += (p >> 24) & 0xff; ++cnt;
+                    }
+                if (!cnt) cnt = 1;
+                out[(size_t)oy * nw + ox] = (r / cnt) | ((g / cnt) << 8) | ((b / cnt) << 16) | ((a / cnt) << 24);
+            }
+        }
+        px.swap(out); w = nw; h = nh;
+        return true;
+    }
 
     int superScale = 2;     // sprite supersampling (1x for 9-slice)
     uint32_t curW = 0, curH = 0;  // current frame logical size
@@ -540,7 +602,7 @@ struct Converter {
     // only the node's own shape is rendered (children omitted); when flatten is
     // true the whole subtree is rasterized into one image (vector-composed icons
     // and boolean operations). PNG is native (scale x); Baked.{x,y,w,h} logical.
-    Baked bake(const Node& n, int scale, bool flatten = false) {
+    Baked bake(const Node& n, int scale, bool flatten = false, bool tryNine = false) {
         Baked out;
         ui->setViewport(curW * scale, curH * scale);
 
@@ -583,6 +645,11 @@ struct Converter {
         for (int y = 0; y < ch; ++y)
             for (int x = 0; x < cw; ++x)
                 crop[static_cast<size_t>(y) * cw + x] = buf[static_cast<size_t>(y0 + y) * bw + x0 + x];
+
+        // 9-slice shrink (baked at 1x so corners map 1:1 to screen): collapse a
+        // uniform stretchable middle to 1px and dedup by the resulting tiny image,
+        // so same-style different-size panels share one texture.
+        if (tryNine && nineShrink(crop, cw, ch, scale, out.ml, out.mr, out.mt, out.mb)) out.nine = true;
 
         // FNV-1a 64 over the cropped pixels.
         uint64_t h = 1469598103934665603ull;
@@ -852,25 +919,21 @@ struct Converter {
                 emitColorBg(f, childAttr);
             }
         } else if (needsBake(n)) {
-            bool wantNine = ninePatchWanted(n);
-            Baked b = bake(n, wantNine ? 1 : superScale);
+            bool cand = nineCandidate(n);
+            Baked b = bake(n, superScale, /*flatten=*/false, /*tryNine=*/cand);
             if (b.ok) {
-                bool nine = wantNine && ninePatchFits(n, b);
                 std::string id = useTexture(b.hash);
-                if (nine) {
+                if (b.nine) {
                     header(name, "NinePatchRect", parentAttr);
                     placeNode(lx, ly, n.width, n.height);
                     commonProps(n, isRoot);
                     body += "texture = ExtResource(\"" + id + "\")\n";
-                    int r = (int)std::lround(cornerR(n));
-                    r = std::min(r, std::min(b.w, b.h) / 2 - 1);
-                    if (r < 0) r = 0;
-                    body += "patch_margin_left = " + std::to_string(r) + "\n";
-                    body += "patch_margin_top = " + std::to_string(r) + "\n";
-                    body += "patch_margin_right = " + std::to_string(r) + "\n";
-                    body += "patch_margin_bottom = " + std::to_string(r) + "\n";
+                    body += "patch_margin_left = " + std::to_string(b.ml) + "\n";
+                    body += "patch_margin_top = " + std::to_string(b.mt) + "\n";
+                    body += "patch_margin_right = " + std::to_string(b.mr) + "\n";
+                    body += "patch_margin_bottom = " + std::to_string(b.mb) + "\n";
                     nodeJson["type"] = "NinePatchRect";
-                    nodeJson["ninePatch"] = {r, r, r, r};
+                    nodeJson["ninePatch"] = {b.ml, b.mt, b.mr, b.mb};
                 } else {
                     header(name, "TextureRect", parentAttr);
                     placeNode(b.x - pax, b.y - pay, b.w, b.h);
@@ -926,23 +989,19 @@ struct Converter {
 
     // Baked background for a container with a complex fill/stroke/corners.
     void emitBg(Node& n, const std::string& parentAttr, json& nodeJson) {
-        bool wantNine = ninePatchWanted(n);
-        Baked b = bake(n, wantNine ? 1 : superScale);
+        bool cand = nineCandidate(n);
+        Baked b = bake(n, superScale, /*flatten=*/false, /*tryNine=*/cand);
         if (!b.ok) return;
         std::string id = useTexture(b.hash);
-        bool nine = wantNine && ninePatchFits(n, b);
-        if (nine) {
+        if (b.nine) {
             header("__bg", "NinePatchRect", parentAttr);
             placeFull();  // stretch to the container's full rect
             body += "texture = ExtResource(\"" + id + "\")\n";
-            int r = (int)std::lround(cornerR(n));
-            r = std::min(r, std::min(b.w, b.h) / 2 - 1);
-            if (r < 0) r = 0;
-            body += "patch_margin_left = " + std::to_string(r) + "\n";
-            body += "patch_margin_top = " + std::to_string(r) + "\n";
-            body += "patch_margin_right = " + std::to_string(r) + "\n";
-            body += "patch_margin_bottom = " + std::to_string(r) + "\n";
-            nodeJson["ninePatch"] = {r, r, r, r};
+            body += "patch_margin_left = " + std::to_string(b.ml) + "\n";
+            body += "patch_margin_top = " + std::to_string(b.mt) + "\n";
+            body += "patch_margin_right = " + std::to_string(b.mr) + "\n";
+            body += "patch_margin_bottom = " + std::to_string(b.mb) + "\n";
+            nodeJson["ninePatch"] = {b.ml, b.mt, b.mr, b.mb};
         } else {
             header("__bg", "TextureRect", parentAttr);
             // Baked bg is in absolute coords; place it relative to the container.
@@ -955,19 +1014,16 @@ struct Converter {
         nodeJson["bg"] = all[b.hash].file;
     }
 
-    // Rounded rectangular panels become stretchable 9-slices (baked at 1x so the
-    // corner pixels map 1:1 to screen — supersampling would inflate them).
-    bool ninePatchWanted(const Node& n) {
+    // A flat rectangular panel (solid/translucent fill, optional 1px border,
+    // clip-path cut OR rounded corners — no gradient-with-content, no image, no
+    // glow) is a 9-slice CANDIDATE: baked at 1x and tested pixel-wise by
+    // nineShrink. Icons/photos (image fill) and shadowed panels keep the full 2x
+    // bake. The actual slice only happens if the pixels really are stretchable.
+    bool nineCandidate(const Node& n) {
         if (!isRectish(n.type)) return false;
         if (hasVisibleEffect(n)) return false;
-        if (cornerR(n) <= 2) return false;
-        for (const auto& p : n.fills)
-            if (p.visible && p.type == figmalib::PaintType::Image) return false;
-        return true;
-    }
-    bool ninePatchFits(const Node& n, const Baked& b) {
-        float r = cornerR(n);
-        return b.w >= 2 * r + 2 && b.h >= 2 * r + 2;
+        return true;  // image fills allowed: a web2canvas-baked clip-corner panel
+                      // is an IMAGE fill; nineShrink rejects real photos (no run).
     }
 
     void emitOffsets(const Node& ic) {
