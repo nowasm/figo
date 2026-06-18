@@ -1025,9 +1025,16 @@ struct Converter {
     // glow) is a 9-slice CANDIDATE: baked at 1x and tested pixel-wise by
     // nineShrink. Icons/photos (image fill) and shadowed panels keep the full 2x
     // bake. The actual slice only happens if the pixels really are stretchable.
+    // Only LARGE panels 9-slice — their corners are a small fraction of the area,
+    // so a 1x-corner NinePatch is barely noticeable while the size win is huge.
+    // Small controls (buttons, sliders, segments, toggles, progress bars) keep
+    // their full 2x bake so their corners/edges stay crisp; the bytes saved there
+    // would be tiny anyway.
+    static constexpr float kNineMinArea = 40000.0f;  // ~200x200 logical
     bool nineCandidate(const Node& n) {
         if (!isRectish(n.type)) return false;
         if (hasVisibleEffect(n)) return false;
+        if (n.width * n.height < kNineMinArea) return false;
         return true;  // image fills allowed: a web2canvas-baked clip-corner panel
                       // is an IMAGE fill; nineShrink rejects real photos (no run).
     }
