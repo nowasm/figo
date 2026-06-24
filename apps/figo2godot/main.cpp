@@ -870,9 +870,12 @@ struct Converter {
             body += "pivot_offset = Vector2(" + num(a.pivotX * n.width) + ", " +
                     num(a.pivotY * n.height) + ")\n";
 
-        // ease-* → cubic(2), linear → linear(1), step* → constant(0).
-        const int interp = a.ease.find("step") != std::string::npos ? 0
-                         : a.ease.find("linear") != std::string::npos ? 1 : 2;
+        // step* → constant(0), everything else → linear(1). Cubic(2) is avoided:
+        // Godot's cubic spline through unevenly-spaced keys (notably the two near-
+        // coincident keys that represent a phase-shifted loop's snap) overshoots
+        // badly, distorting size and even reversing the visible direction. The
+        // ease-out nicety isn't worth that; linear is faithful enough for a pulse.
+        const int interp = a.ease.find("step") != std::string::npos ? 0 : 1;
 
         const std::string animRes = "Anim_" + std::to_string(subId);
         const std::string libRes = "AnimLib_" + std::to_string(subId);

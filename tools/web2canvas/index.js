@@ -200,14 +200,18 @@ function collectorFn({ rootSelector, aiName }) {
         }
         return ks[ks.length - 1][field];
       };
-      const EPS = 1e-4;
+      // GAP separates the two seam keys (pre-snap, post-snap). It must survive
+      // figo2godot's 3-decimal (0.001s) time formatting after ×duration, or the
+      // keys collapse onto one timestamp and the snap plays backwards — size it
+      // in real time: ≥6ms regardless of period length. DET is the seam detector.
+      const GAP = Math.max(0.008, 0.006 / dur), DET = 1e-4;
       const times = new Set([0, 1, sFrac]);
       for (const k of keys) times.add(((((k.t + sFrac) % 1) + 1) % 1));
       outKeys = [];
       for (const t of [...times].filter(x => x >= 0 && x <= 1).sort((x, y) => x - y)) {
-        if (Math.abs(t - sFrac) < EPS && t > EPS && t < 1 - EPS) {
+        if (Math.abs(t - sFrac) < DET && t > GAP && t < 1 - GAP) {
           // the period-boundary snap lands here: end-of-curve then start-of-curve.
-          const pre = { t: +(t - EPS).toFixed(5) }, post = { t: +t.toFixed(5) };
+          const pre = { t: +(t - GAP).toFixed(5) }, post = { t: +t.toFixed(5) };
           if (sawOpacity) { pre.opacity = +sample('opacity', 1).toFixed(4); post.opacity = +sample('opacity', 0).toFixed(4); }
           if (sawScale)   { pre.scale = sample('scale', 1).map(x => +x.toFixed(4)); post.scale = sample('scale', 0).map(x => +x.toFixed(4)); }
           outKeys.push(pre, post);
