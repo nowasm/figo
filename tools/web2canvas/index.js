@@ -177,34 +177,48 @@ function collectorFn({ rootSelector, aiName }) {
 
     const delay = parseFloat(cs.animationDelay) || 0;
     // animation-delay on an infinite loop is a phase offset (the staggered
-    // voiceprint bars). Engine players all autoplay at t=0, so bake the phase
-    // into the keyframes by resampling the (periodic) curve shifted by -delay.
+    // voiceprint bars, the second alarm ring). Engine players all autoplay at
+    // t=0, so bake the phase in by shifting the keyframes by -delay. Crucially,
+    // sampling stays WITHIN the [0,1] segments — never across the period-boundary
+    // snap (a ring's 1.35→0.7 jump each cycle) — or the snap would smear into a
+    // ramp and reverse the visible direction (outward expand → inward). The snap
+    // is re-emitted as a pair of keys at the seam.
     let outKeys = keys;
     const sFrac = ((((delay % dur) / dur) % 1) + 1) % 1;
     if (iter === 0 && sFrac > 1e-4) {
       const lerpV = (a, b, u) => Array.isArray(a) ? a.map((av, i) => av + (b[i] - av) * u) : a + (b - a) * u;
+      // value of `field` at phase p∈[0,1]; phase 0/1 return the first/last key
+      // (the snap endpoints), interpolation only inside real segments.
       const sample = (field, phase) => {
         const ks = keys.filter(k => field in k);
         if (!ks.length) return undefined;
         if (ks.length === 1) return ks[0][field];
-        const p = ((phase % 1) + 1) % 1;
-        for (let i = 0; i < ks.length; i++) {
-          const a = ks[i], b = ks[(i + 1) % ks.length];
-          const t0 = a.t, t1 = i === ks.length - 1 ? b.t + 1 : b.t;
-          const pp = i === ks.length - 1 && p < a.t ? p + 1 : p;
-          if (pp >= t0 && pp <= t1) return lerpV(a[field], b[field], t1 > t0 ? (pp - t0) / (t1 - t0) : 0);
+        const p = Math.min(1, Math.max(0, phase));
+        for (let i = 0; i < ks.length - 1; i++) {
+          const a = ks[i], b = ks[i + 1];
+          if (p >= a.t && p <= b.t) return lerpV(a[field], b[field], b.t > a.t ? (p - a.t) / (b.t - a.t) : 0);
         }
-        return ks[0][field];
+        return ks[ks.length - 1][field];
       };
-      const phases = new Set([0, 1]);
-      for (const k of keys) phases.add(((((k.t + sFrac) % 1) + 1) % 1));
-      outKeys = [...phases].sort((x, y) => x - y).map(t => {
-        const src = ((((t - sFrac) % 1) + 1) % 1);
-        const o = { t: +t.toFixed(4) };
-        if (sawOpacity) { const v = sample('opacity', src); if (v !== undefined) o.opacity = +v.toFixed(4); }
-        if (sawScale)   { const v = sample('scale', src);   if (v !== undefined) o.scale = v.map(x => +x.toFixed(4)); }
-        return o;
-      });
+      const EPS = 1e-4;
+      const times = new Set([0, 1, sFrac]);
+      for (const k of keys) times.add(((((k.t + sFrac) % 1) + 1) % 1));
+      outKeys = [];
+      for (const t of [...times].filter(x => x >= 0 && x <= 1).sort((x, y) => x - y)) {
+        if (Math.abs(t - sFrac) < EPS && t > EPS && t < 1 - EPS) {
+          // the period-boundary snap lands here: end-of-curve then start-of-curve.
+          const pre = { t: +(t - EPS).toFixed(5) }, post = { t: +t.toFixed(5) };
+          if (sawOpacity) { pre.opacity = +sample('opacity', 1).toFixed(4); post.opacity = +sample('opacity', 0).toFixed(4); }
+          if (sawScale)   { pre.scale = sample('scale', 1).map(x => +x.toFixed(4)); post.scale = sample('scale', 0).map(x => +x.toFixed(4)); }
+          outKeys.push(pre, post);
+        } else {
+          const src = ((((t - sFrac) % 1) + 1) % 1);
+          const o = { t: +t.toFixed(5) };
+          if (sawOpacity) { const v = sample('opacity', src); if (v !== undefined) o.opacity = +v.toFixed(4); }
+          if (sawScale)   { const v = sample('scale', src);   if (v !== undefined) o.scale = v.map(x => +x.toFixed(4)); }
+          outKeys.push(o);
+        }
+      }
     }
     return { dur, delay, iter, pivot,
              ease: (cs.animationTimingFunction || 'linear').split(',')[0].trim(), keys: outKeys };
