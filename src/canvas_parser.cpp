@@ -1084,6 +1084,11 @@ std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {
                     k.sx = (*sc)[0].get<float>();
                     k.sy = (*sc)[1].get<float>();
                 }
+                if (auto ps = kj.find("pos"); ps != kj.end() && ps->is_array() && ps->size() >= 2) {
+                    k.hasPos = true;
+                    k.dx = (*ps)[0].get<float>();
+                    k.dy = (*ps)[1].get<float>();
+                }
                 a.keys.push_back(k);
             }
         }

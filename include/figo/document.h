@@ -180,13 +180,16 @@ struct TextRun {
 };
 
 // One CSS @keyframes stop, reduced to the properties we can replay in an engine
-// AnimationPlayer: normalized time t∈[0,1] plus optional opacity / 2D scale.
+// AnimationPlayer: normalized time t∈[0,1] plus optional opacity / 2D scale /
+// 2D position delta (rest-relative px, for translate/slash-sweep animations).
 struct AnimKey {
     float t = 0;
     bool hasOpacity = false;
     float opacity = 1.0f;
     bool hasScale = false;
     float sx = 1.0f, sy = 1.0f;
+    bool hasPos = false;
+    float dx = 0.0f, dy = 0.0f;
 };
 
 // A node's CSS animation, captured by web2canvas (animation-* + the resolved

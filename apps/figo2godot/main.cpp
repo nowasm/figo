@@ -887,12 +887,12 @@ struct Converter {
     // node), so tracks target "." . Must be called while `body`'s last [node]
     // is still this node (before any child [node] is written) so pivot_offset
     // attaches here. selfPath is the node's own .tscn path (its children's parent).
-    void emitAnim(const Node& n, const std::string& selfPath) {
+    void emitAnim(const Node& n, const std::string& selfPath, float baseX, float baseY) {
         if (!n.anim) return;
         const NodeAnim& a = *n.anim;
-        bool anyScale = false, anyOpacity = false;
-        for (const auto& k : a.keys) { anyScale |= k.hasScale; anyOpacity |= k.hasOpacity; }
-        if (!anyScale && !anyOpacity) return;
+        bool anyScale = false, anyOpacity = false, anyPos = false;
+        for (const auto& k : a.keys) { anyScale |= k.hasScale; anyOpacity |= k.hasOpacity; anyPos |= k.hasPos; }
+        if (!anyScale && !anyOpacity && !anyPos) return;
 
         // Scale pivots about transform-origin → set pivot_offset on this node.
         if (anyScale && n.width > 0 && n.height > 0)
@@ -948,6 +948,10 @@ struct Converter {
               [](const AnimKey& k) { return num(k.opacity); });
         track("scale", [](const AnimKey& k) { return k.hasScale; },
               [](const AnimKey& k) { return std::string("Vector2(") + num(k.sx) + ", " + num(k.sy) + ")"; });
+        // Position track: the rest-relative px delta added to the node's exported
+        // top-left offset (a translate shake / a rotated slash sweep).
+        track("position", [](const AnimKey& k) { return k.hasPos; },
+              [&](const AnimKey& k) { return std::string("Vector2(") + num(baseX + k.dx) + ", " + num(baseY + k.dy) + ")"; });
         if (tn == 0) return;  // nothing replayable
 
         s += "\n[sub_resource type=\"AnimationLibrary\" id=\"" + libRes + "\"]\n";
@@ -1016,6 +1020,9 @@ struct Converter {
         json nodeJson;
         nodeJson["name"] = name;
         nodeJson["path"] = childAttr;
+        // Top-left offset actually emitted for this node — the base a position
+        // animation track adds its delta to (raster branches bake from b.x/b.y).
+        float baseX = lx, baseY = ly;
 
         if (n.type == NodeType::Text) {
             header(name, "Label", parentAttr);
@@ -1050,6 +1057,7 @@ struct Converter {
                 std::string id = useTexture(b.hash);
                 header(name, "TextureRect", parentAttr);
                 placeNode(b.x - pax, b.y - pay, b.w, b.h);
+                baseX = b.x - pax; baseY = b.y - pay;
                 commonProps(n, isRoot);
                 body += "texture = ExtResource(\"" + id + "\")\n";
                 body += "expand_mode = 1\nstretch_mode = 0\n";
@@ -1063,7 +1071,7 @@ struct Converter {
                 nodeJson["type"] = "Control";
             }
             frameNodes.push_back(nodeJson);
-            emitAnim(n, childAttr);
+            emitAnim(n, childAttr, baseX, baseY);
             return;  // do not recurse into the flattened subtree
         } else if (scrollFrame) {
             // overflow:auto/scroll frame whose content overflows -> Godot
@@ -1082,7 +1090,7 @@ struct Converter {
             body += "vertical_scroll_mode = "   + std::string(scrollV ? "1" : "0") + "\n";
             nodeJson["type"] = "ScrollContainer";
             frameNodes.push_back(nodeJson);
-            emitAnim(n, childAttr);
+            emitAnim(n, childAttr, baseX, baseY);
 
             const std::string contentAttr = (childAttr == ".") ? "__scroll" : childAttr + "/__scroll";
             header("__scroll", "Control", childAttr);
@@ -1133,6 +1141,7 @@ struct Converter {
                 } else {
                     header(name, "TextureRect", parentAttr);
                     placeNode(b.x - pax, b.y - pay, b.w, b.h);
+                    baseX = b.x - pax; baseY = b.y - pay;
                     commonProps(n, isRoot);
                     body += "texture = ExtResource(\"" + id + "\")\n";
                     body += "expand_mode = 1\nstretch_mode = 0\n";  // scale texture to rect
@@ -1159,7 +1168,7 @@ struct Converter {
         }
 
         frameNodes.push_back(nodeJson);
-        emitAnim(n, childAttr);
+        emitAnim(n, childAttr, baseX, baseY);
 
         // Children anchor within this node's rect; names unique among siblings.
         std::map<std::string, int> used;

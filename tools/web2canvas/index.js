@@ -120,7 +120,32 @@ function collectorFn({ rootSelector, aiName }) {
       return [parseFloat(m[1]), m[2] !== undefined ? parseFloat(m[2]) : parseFloat(m[1])];
     if ((m = /scaleX\(\s*([-\d.]+)\s*\)/.exec(tf))) return [parseFloat(m[1]), 1];
     if ((m = /scaleY\(\s*([-\d.]+)\s*\)/.exec(tf))) return [1, parseFloat(m[1])];
-    return null;  // translate/rotate/matrix: not in the minimal subset
+    return null;
+  }
+  // Compose a CSS transform string into a 2×3 affine matrix [a,b,c,d,e,f] (CSS
+  // column-vector convention). Used to extract the net 2D TRANSLATION (e,f) of a
+  // keyframe — so a `rotate(θ) translateX(t)` slash sweep resolves to the screen
+  // displacement (t·cosθ, t·sinθ) without needing a separate rotation track.
+  function transformMat(tf) {
+    let m = [1, 0, 0, 1, 0, 0];
+    if (!tf || tf === 'none') return m;
+    const mul = (n) => { m = [
+      m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1],
+      m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3],
+      m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5] ]; };
+    const re = /(\w+)\(([^)]*)\)/g; let mm;
+    while ((mm = re.exec(tf))) {
+      const fn = mm[1], a = mm[2].split(',').map(s => parseFloat(s) || 0);
+      if (fn === 'matrix' && a.length === 6) mul(a);
+      else if (fn === 'translate') mul([1,0,0,1, a[0], a[1] || 0]);
+      else if (fn === 'translateX') mul([1,0,0,1, a[0], 0]);
+      else if (fn === 'translateY') mul([1,0,0,1, 0, a[0]]);
+      else if (fn === 'rotate') { const r = a[0]*Math.PI/180, c = Math.cos(r), s = Math.sin(r); mul([c,s,-s,c,0,0]); }
+      else if (fn === 'scale') mul([a[0]||1,0,0, a.length>1?a[1]:(a[0]||1), 0,0]);
+      else if (fn === 'scaleX') mul([a[0]||1,0,0,1,0,0]);
+      else if (fn === 'scaleY') mul([1,0,0,a[0]||1,0,0]);
+    }
+    return m;
   }
   function animOf(cs, r) {
     const name = (cs.animationName || 'none').split(',')[0].trim();
@@ -134,8 +159,15 @@ function collectorFn({ rootSelector, aiName }) {
     const to = (cs.transformOrigin || '').split(' ').map(parseFloat);
     if (to.length >= 2 && r.width > 0 && r.height > 0 && isFinite(to[0]) && isFinite(to[1]))
       pivot = [to[0] / r.width, to[1] / r.height];
+    // Translate (position) keyframes are replayed only for FINITE animations:
+    // they compose with the node's CAPTURED base box, which for a finished
+    // `both`-fill animation equals the last keyframe — so positions are emitted
+    // rest-relative to that (subtracted below). An infinite loop has no settled
+    // rest box to anchor against, so its translate is skipped (only opacity/
+    // scale loop via the phase-baking path).
+    const finite = iter !== 0;
     const keys = [];
-    let sawOpacity = false, sawScale = false, sawHeight = false;
+    let sawOpacity = false, sawScale = false, sawHeight = false, sawPos = false;
     for (const rule of kfMap[name].cssRules) {
       if (!rule.keyText) continue;
       for (const kt of rule.keyText.split(',')) {
@@ -146,6 +178,10 @@ function collectorFn({ rootSelector, aiName }) {
         if (rule.style.opacity !== '') { k.opacity = parseFloat(rule.style.opacity); sawOpacity = true; }
         const sc = parseScale(rule.style.transform);
         if (sc) { k.scale = sc; sawScale = true; }
+        if (finite && rule.style.transform && rule.style.transform !== 'none') {
+          const mat = transformMat(rule.style.transform);
+          if (Math.abs(mat[4]) > 0.01 || Math.abs(mat[5]) > 0.01) { k.pos = [mat[4], mat[5]]; sawPos = true; }
+        }
         // height keyframes (equalizer/voiceprint bars) → scaleY about the
         // element's CAPTURED box height, so the absolute px land correctly
         // regardless of which animation phase the snapshot caught.
@@ -155,7 +191,7 @@ function collectorFn({ rootSelector, aiName }) {
           if (k.scale) k.scale[1] = sy; else k.scale = [1, sy];
           sawScale = true; sawHeight = true;
         }
-        if ('opacity' in k || 'scale' in k) keys.push(k);
+        if ('opacity' in k || 'scale' in k || 'pos' in k) keys.push(k);
       }
     }
     if (!keys.length) return null;
@@ -170,10 +206,19 @@ function collectorFn({ rootSelector, aiName }) {
       const e = { t: tt };
       if (sawOpacity) e.opacity = 1;
       if (sawScale) e.scale = [1, 1];
+      if (sawPos) e.pos = [0, 0];
       keys.push(e);
     };
     ensure(0); ensure(1);
     keys.sort((a, b) => a.t - b.t);
+    // Position is rest-relative: the captured box already sits at the resting
+    // (last-keyframe) translate, so subtract it — the engine then animates the
+    // delta around the node's exported offset, landing back at rest at t=1.
+    if (sawPos) {
+      const restKeys = keys.filter(k => k.pos);
+      const rest = restKeys[restKeys.length - 1].pos;
+      for (const k of keys) if (k.pos) k.pos = [k.pos[0] - rest[0], k.pos[1] - rest[1]];
+    }
 
     const delay = parseFloat(cs.animationDelay) || 0;
     // animation-delay on an infinite loop is a phase offset (the staggered
