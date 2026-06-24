@@ -870,12 +870,15 @@ struct Converter {
             body += "pivot_offset = Vector2(" + num(a.pivotX * n.width) + ", " +
                     num(a.pivotY * n.height) + ")\n";
 
-        // step* → constant(0), everything else → linear(1). Cubic(2) is avoided:
-        // Godot's cubic spline through unevenly-spaced keys (notably the two near-
-        // coincident keys that represent a phase-shifted loop's snap) overshoots
-        // badly, distorting size and even reversing the visible direction. The
-        // ease-out nicety isn't worth that; linear is faithful enough for a pulse.
-        const int interp = a.ease.find("step") != std::string::npos ? 0 : 1;
+        // A CSS step timing (mcflash blinks 1↔0.35) maps to a DISCRETE update
+        // (hold the key value, jump at the next key) — NOT interp=NEAREST, which
+        // on a `modulate:a` sub-property track collapses to 0 in Godot (the flash
+        // vanished). Everything else is continuous + linear; cubic is avoided
+        // because its spline overshoots through the snap's near-coincident keys,
+        // distorting size and even reversing the visible direction.
+        const bool stepEase = a.ease.find("step") != std::string::npos;
+        const int interp = 1;            // discrete update ignores interp; linear otherwise
+        const int update = stepEase ? 1 : 0;   // 1 = UPDATE_DISCRETE, 0 = UPDATE_CONTINUOUS
 
         const std::string animRes = "Anim_" + std::to_string(subId);
         const std::string libRes = "AnimLib_" + std::to_string(subId);
@@ -907,7 +910,7 @@ struct Converter {
             s += "tracks/" + std::to_string(tn) + "/keys = {\n";
             s += "\"times\": PackedFloat32Array(" + times + "),\n";
             s += "\"transitions\": PackedFloat32Array(" + trans + "),\n";
-            s += "\"update\": 0,\n";
+            s += "\"update\": " + std::to_string(update) + ",\n";
             s += "\"values\": [" + vals + "]\n";
             s += "}\n";
             ++tn;
