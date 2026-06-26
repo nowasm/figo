@@ -25,7 +25,8 @@ const { chromium } = require('playwright-core');
 function parseArgs(argv) {
   const a = { input: null, out: null, root: 'body', vw: 1280, vh: 720,
               browser: 'msedge', wait: 400, scale: 2, fonts: null, states: null,
-              flows: null, navFn: '__nav', navReset: '__w2c_reset__', aiName: false };
+              flows: null, navFn: '__nav', navReset: '__w2c_reset__', aiName: false,
+              pick: false, pickKey: 'f', pickAt: null, pickFreezeAt: null };
   for (let i = 2; i < argv.length; i++) {
     const t = argv[i];
     if (t === '-o' || t === '--out') a.out = argv[++i];
@@ -40,6 +41,10 @@ function parseArgs(argv) {
     else if (t === '--nav-fn') a.navFn = argv[++i];
     else if (t === '--nav-reset') a.navReset = argv[++i];
     else if (t === '--ai-name') a.aiName = true;
+    else if (t === '--pick') a.pick = true;
+    else if (t === '--pick-key') a.pickKey = (argv[++i] || 'f').slice(0, 1).toLowerCase();
+    else if (t === '--pick-at') { const m = /(-?\d+)\s*,\s*(-?\d+)/.exec(argv[++i] || ''); if (m) { a.pick = true; a.pickAt = { x: +m[1], y: +m[2] }; } }
+    else if (t === '--pick-freeze') { const m = /(-?\d+)\s*,\s*(-?\d+)/.exec(argv[++i] || ''); if (m) a.pickFreezeAt = { x: +m[1], y: +m[2] }; }
     else if (!t.startsWith('-')) a.input = t;
   }
   return a;
@@ -953,6 +958,108 @@ function rasterMarks(n, acc) {
 // plus a list of interaction steps run before the screenshot. Each capture maps
 // to one top-level frame -> one .tscn. Build them from --flows (rich) or
 // --states (simple nav-only), falling back to a single current-screen capture.
+// ---- interactive pick mode -------------------------------------------------
+// In-page overlay: a devtools-style hover highlight. Plain clicks/hovers pass
+// THROUGH to the page (so the user can open modals/dropdowns, navigate, type to
+// stage the UI). Alt+Click picks the element under the cursor (tags it
+// data-w2c-pick and signals Node). The freeze key tags the hovered ancestor
+// chain (data-w2c-hover) and asks Node to pin :hover via CDP so pure-CSS hover
+// UI stays open while the cursor moves away to pick it.
+function pickerOverlayFn(pickKey) {
+  if (window.__w2cPicker) return;
+  window.__w2cPicker = true;
+  const mk = css => { const d = document.createElement('div'); d.style.cssText = css; document.documentElement.appendChild(d); return d; };
+  const Z = '2147483647';
+  const box = mk(`position:fixed;z-index:${Z};pointer-events:none;border:2px solid #4af;background:rgba(68,170,255,.12);box-sizing:border-box;display:none`);
+  const tag = mk(`position:fixed;z-index:${Z};pointer-events:none;background:#4af;color:#fff;font:11px/1.4 monospace;padding:1px 5px;border-radius:3px;display:none;white-space:nowrap`);
+  const hint = mk(`position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:${Z};pointer-events:none;background:rgba(0,0,0,.82);color:#fff;font:12px/1.5 system-ui,sans-serif;padding:6px 12px;border-radius:6px`);
+  const baseHint = `Alt+点击 = 拾取组件   ${pickKey.toUpperCase()} = 冻结(钉住 :hover/停动画)   普通点击/操作 = 正常交互`;
+  hint.textContent = baseHint;
+  const mine = el => el === box || el === tag || el === hint;
+  let lastEl = null, lastX = 0, lastY = 0, frozen = false;
+  function show(el) {
+    if (!el) { box.style.display = tag.style.display = 'none'; return; }
+    const r = el.getBoundingClientRect();
+    box.style.left = r.left + 'px'; box.style.top = r.top + 'px';
+    box.style.width = r.width + 'px'; box.style.height = r.height + 'px'; box.style.display = 'block';
+    const cls = (typeof el.className === 'string' && el.className.trim()) ? '.' + el.className.trim().split(/\s+/)[0] : '';
+    tag.textContent = `${el.tagName.toLowerCase()}${cls}  ${Math.round(r.width)}×${Math.round(r.height)}`;
+    tag.style.left = r.left + 'px'; tag.style.top = Math.max(0, r.top - 18) + 'px'; tag.style.display = 'block';
+  }
+  document.addEventListener('mousemove', e => {
+    lastX = e.clientX; lastY = e.clientY;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (el && !mine(el)) { lastEl = el; show(el); }
+  }, true);
+  document.addEventListener('click', e => {
+    if (!e.altKey) return;                 // plain click → let the page handle it
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    const el = document.elementFromPoint(e.clientX, e.clientY) || lastEl;
+    if (!el) return;
+    el.setAttribute('data-w2c-pick', '');
+    box.style.display = tag.style.display = hint.style.display = 'none';
+    window.__w2cPick();
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (!frozen && e.key.toLowerCase() === pickKey) {
+      let el = document.elementFromPoint(lastX, lastY);
+      while (el) { if (!mine(el)) el.setAttribute('data-w2c-hover', ''); el = el.parentElement; }
+      frozen = true;
+      hint.textContent = `❄ 已冻结 — Alt+点击 拾取已显形的组件   Esc 解冻`;
+      window.__w2cFreeze();
+    } else if (frozen && e.key === 'Escape') {
+      document.querySelectorAll('[data-w2c-hover]').forEach(n => n.removeAttribute('data-w2c-hover'));
+      frozen = false;
+      hint.textContent = baseHint;
+      window.__w2cUnfreeze();
+    }
+  }, true);
+}
+
+// Node side: open the picker, wire CDP-based freeze, resolve when the user picks.
+async function interactivePick(page, pickKey, at, freezeAt) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('DOM.enable').catch(() => {});
+  await cdp.send('CSS.enable').catch(() => {});
+  await cdp.send('Animation.enable').catch(() => {});
+  const forceHover = async (on) => {
+    const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
+    const { nodeIds } = await cdp.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: '[data-w2c-hover]' });
+    for (const nodeId of nodeIds) {
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: on ? ['hover'] : [] }).catch(() => {});
+    }
+  };
+  let resolve;
+  const picked = new Promise(r => (resolve = r));
+  await page.exposeFunction('__w2cPick', () => resolve());
+  await page.exposeFunction('__w2cFreeze', async () => {
+    try { await forceHover(true); await cdp.send('Animation.setPlaybackRate', { playbackRate: 0 }); }
+    catch (e) { console.error('  freeze:', e.message); }
+  });
+  await page.exposeFunction('__w2cUnfreeze', async () => {
+    try { await forceHover(false); await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 }); }
+    catch (e) {}
+  });
+  await page.evaluate(pickerOverlayFn, pickKey);
+  if (at) {   // non-interactive: pick at coordinates (scripted / AI / self-test)
+    if (freezeAt) {   // hover the trigger then fire the freeze key (real overlay path)
+      await page.mouse.move(freezeAt.x, freezeAt.y);
+      await page.waitForTimeout(120);
+      await page.keyboard.press(pickKey);
+      await page.waitForTimeout(150);
+    }
+    await page.mouse.move(at.x, at.y);
+    await page.waitForTimeout(120);
+    await page.keyboard.down('Alt');     // mouse.click ignores modifiers; hold Alt via keyboard
+    await page.mouse.click(at.x, at.y);
+    await page.keyboard.up('Alt');
+  } else {
+    console.log('\n  >>> PICK MODE — 在浏览器窗口里把组件准备到位(点开 modal/下拉、切 tab、滚动…)');
+    console.log(`      然后 Alt+点击 拾取它。纯 :hover 的 UI:先 hover 出来,按 ${pickKey.toUpperCase()} 冻结,再 Alt+点击。\n`);
+  }
+  await picked;   // forced :hover stays on through collection so the picked UI keeps rendering
+}
+
 function buildCaptures(a) {
   if (a.flows) {
     const raw = JSON.parse(fs.readFileSync(a.flows, 'utf8'));
@@ -1125,13 +1232,13 @@ async function aiNamePass(page, records, dir) {
 
 (async () => {
   const a = parseArgs(process.argv);
-  if (!a.input) { console.error('usage: web2canvas <url|file.html> [-o out] [--root SEL] [--viewport WxH] [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--ai-name] [--browser msedge|chrome] [--scale N]'); process.exit(2); }
-  const out = a.out || a.input.replace(/\.[^.]+$/, '') + '.canvas.json';
+  if (!a.input) { console.error('usage: web2canvas <url|file.html> [-o out] [--root SEL] [--pick] [--pick-key KEY] [--viewport WxH] [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--ai-name] [--browser msedge|chrome] [--scale N]'); process.exit(2); }
+  const out = a.out || (a.pick ? 'picked.canvas.json' : a.input.replace(/\.[^.]+$/, '') + '.canvas.json');
   const outDir = path.dirname(path.resolve(out));
   const imagesDir = path.join(outDir, 'images');
 
   console.log(`launching ${a.browser} ...`);
-  const browser = await chromium.launch({ channel: a.browser, headless: true });
+  const browser = await chromium.launch({ channel: a.browser, headless: a.pickAt ? true : !a.pick });
   const page = await browser.newPage({ viewport: { width: a.vw, height: a.vh }, deviceScaleFactor: a.scale });
   // Many UIs gate animations behind @media (prefers-reduced-motion: no-preference);
   // headless can default to 'reduce', which strips animation-* off the elements so
@@ -1169,6 +1276,13 @@ async function aiNamePass(page, records, dir) {
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(500);
     } catch (e) { console.error('fonts:', e.message); }
+  }
+  // Pick mode: let the user stage + click-select one component in the live page.
+  // The picked element is tagged data-w2c-pick; collect just that subtree.
+  if (a.pick) {
+    await interactivePick(page, a.pickKey, a.pickAt, a.pickFreezeAt);
+    a.root = '[data-w2c-pick]';
+    a.states = null; a.flows = null;   // a single current-state capture of the pick
   }
   // Captures: each is one screen (nav target + interaction steps) and becomes
   // one top-level frame. --flows gives click-driven popups/overlays; --states is

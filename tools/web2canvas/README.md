@@ -60,6 +60,14 @@ node index.js <url|file.html> [-o out.canvas.json] [--root SEL]
 | `--fonts DIR` | serve the project's `fonts.css` so text is measured at real widths |
 | `--ai-name` | name components from their rendered look via the `claude` CLI (vision) — see below |
 | `--scale N` | rasterization supersample (default 2) |
+| `--pick` | **interactive pick** — opens a real (headed) browser; stage the UI yourself (open modals/dropdowns, switch tabs, scroll), then **Alt+Click** the element to export just that component (single frame). For pure CSS `:hover` UI that vanishes when the cursor leaves: hover it, press the freeze key to pin `:hover` + stop animations (via CDP), then Alt+Click. |
+| `--pick-key KEY` | freeze hotkey for `--pick` (default `f`) |
+| `--pick-at "x,y"` | **scriptable pick** — non-interactive Alt+Click at viewport coords (headless). For AI/automation: pick a component by coordinate read off a screenshot |
+| `--pick-freeze "x,y"` | with `--pick-at`: hover+freeze at this point first (pins `:hover`), then pick — captures hover-gated UI without a human |
+
+Pick mode emits one frame containing only the picked subtree; the output
+`canvas.json` opens directly in **figoedit** (`open_document`) for editing, or
+feeds `figo2godot` / `figoplay` like any other capture.
 
 ## Popups & overlays: click-driven flows (`--flows`)
 
