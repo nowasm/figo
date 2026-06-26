@@ -64,10 +64,13 @@ node index.js <url|file.html> [-o out.canvas.json] [--root SEL]
 | `--pick-key KEY` | freeze hotkey for `--pick` (default `f`) |
 | `--pick-at "x,y"` | **scriptable pick** — non-interactive Alt+Click at viewport coords (headless). For AI/automation: pick a component by coordinate read off a screenshot |
 | `--pick-freeze "x,y"` | with `--pick-at`: hover+freeze at this point first (pins `:hover`), then pick — captures hover-gated UI without a human |
+| `--open` / `--no-open` | open the result in **figoedit** when done. Interactive `--pick` does this by default (`--no-open` to skip); headless/script paths (`--pick-at`, plain captures) open only with `--open` |
 
 Pick mode emits one frame containing only the picked subtree; the output
 `canvas.json` opens directly in **figoedit** (`open_document`) for editing, or
-feeds `figo2godot` / `figoplay` like any other capture.
+feeds `figo2godot` / `figoplay` like any other capture. After an interactive
+`--pick`, web2canvas auto-launches `build/figoedit <out>` for a quick preview
+(disable with `--no-open`).
 
 ## Popups & overlays: click-driven flows (`--flows`)
 

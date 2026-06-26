@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const { chromium } = require('playwright-core');
 
 // ---- CLI ------------------------------------------------------------------
@@ -26,7 +26,7 @@ function parseArgs(argv) {
   const a = { input: null, out: null, root: 'body', vw: 1280, vh: 720,
               browser: 'msedge', wait: 400, scale: 2, fonts: null, states: null,
               flows: null, navFn: '__nav', navReset: '__w2c_reset__', aiName: false,
-              pick: false, pickKey: 'f', pickAt: null, pickFreezeAt: null };
+              pick: false, pickKey: 'f', pickAt: null, pickFreezeAt: null, open: null };
   for (let i = 2; i < argv.length; i++) {
     const t = argv[i];
     if (t === '-o' || t === '--out') a.out = argv[++i];
@@ -45,6 +45,8 @@ function parseArgs(argv) {
     else if (t === '--pick-key') a.pickKey = (argv[++i] || 'f').slice(0, 1).toLowerCase();
     else if (t === '--pick-at') { const m = /(-?\d+)\s*,\s*(-?\d+)/.exec(argv[++i] || ''); if (m) { a.pick = true; a.pickAt = { x: +m[1], y: +m[2] }; } }
     else if (t === '--pick-freeze') { const m = /(-?\d+)\s*,\s*(-?\d+)/.exec(argv[++i] || ''); if (m) a.pickFreezeAt = { x: +m[1], y: +m[2] }; }
+    else if (t === '--open') a.open = true;
+    else if (t === '--no-open') a.open = false;
     else if (!t.startsWith('-')) a.input = t;
   }
   return a;
@@ -1228,11 +1230,34 @@ async function aiNamePass(page, records, dir) {
   console.log(`  ai-name: renamed ${renamed}/${reps.length} unique components`);
 }
 
+// ---- figoedit preview -----------------------------------------------------
+
+// Launch figoedit on the freshly written canvas.json so the user can eyeball /
+// edit the result without a second command. Detached + unref'd so web2canvas
+// exits cleanly while the editor stays open. Returns false (with a hint) when
+// the binary isn't built yet — never fatal.
+function openInFigoedit(file) {
+  const exe = path.join(__dirname, '..', '..', 'build', process.platform === 'win32' ? 'figoedit.exe' : 'figoedit');
+  if (!fs.existsSync(exe)) {
+    console.error(`figoedit not found at ${exe} (build it, then: figoedit ${path.basename(file)})`);
+    return false;
+  }
+  try {
+    const child = spawn(exe, [path.resolve(file)], { detached: true, stdio: 'ignore' });
+    child.unref();
+    console.log(`opening in figoedit -> ${exe}`);
+    return true;
+  } catch (e) {
+    console.error('figoedit launch failed:', e.message);
+    return false;
+  }
+}
+
 // ---- main -----------------------------------------------------------------
 
 (async () => {
   const a = parseArgs(process.argv);
-  if (!a.input) { console.error('usage: web2canvas <url|file.html> [-o out] [--root SEL] [--pick] [--pick-key KEY] [--viewport WxH] [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--ai-name] [--browser msedge|chrome] [--scale N]'); process.exit(2); }
+  if (!a.input) { console.error('usage: web2canvas <url|file.html> [-o out] [--root SEL] [--pick] [--pick-key KEY] [--open|--no-open] [--viewport WxH] [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--ai-name] [--browser msedge|chrome] [--scale N]'); process.exit(2); }
   const out = a.out || (a.pick ? 'picked.canvas.json' : a.input.replace(/\.[^.]+$/, '') + '.canvas.json');
   const outDir = path.dirname(path.resolve(out));
   const imagesDir = path.join(outDir, 'images');
@@ -1459,4 +1484,9 @@ async function aiNamePass(page, records, dir) {
   };
   fs.writeFileSync(out, JSON.stringify(doc, null, 2));
   console.log(`RESULT: OK  ${frames.length} frame(s)  ${totShot}/${totMarks} rasters -> ${out}`);
+  // Interactive pick (a human just Alt-clicked in a headed browser) previews in
+  // figoedit by default — override with --no-open. The headless/script paths
+  // (--pick-at, plain captures) leave the glue to the AI/pipeline layer
+  // (Bash + MCP open_document) and open only on explicit --open.
+  if (a.open !== null ? a.open : (a.pick && !a.pickAt)) openInFigoedit(out);
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1); });
