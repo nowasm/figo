@@ -39,10 +39,12 @@ fill——和"矢量→贴图"目标一致。
 
 ## 2. 一条命令跑
 ```
-node tools/web2canvas/html2godot.js <url|file.html> --out <godotDir> \
+node tools/web2canvas/html2godot.js <url|file.html> --out <godotDir> --prefabs \
      [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--root SEL] [--viewport WxH] \
-     [--wait MS] [--prefabs] [--ai-name] [--browser msedge|chrome] [--figo2godot <exe>]
+     [--wait MS] [--ai-name] [--browser msedge|chrome] [--figo2godot <exe>]
 ```
+> **本项目约定：`--prefabs` 默认启用**——跑这条命令时总是带上 `--prefabs`，
+> 除非用户明确说不要 prefab。
 `<godotDir>/` 即一个可直接 Godot 4 打开的工程：每屏一个 `.tscn`、去重 sprites、
 打包字体、`manifest.json`、`project.godot`。中间产物在 `<godotDir>/.web2canvas/`。
 
@@ -69,8 +71,8 @@ node tools/web2canvas/html2godot.js <url|file.html> --out <godotDir> \
   文字会重叠/错位。给了 web2canvas 会注入 fonts.css + 等 `document.fonts.ready`
   再测量，figo2godot 把字体绑进 `theme_override_fonts`。
 - `--prefabs`：把重复组件（卡片/按钮/行）抽成 `components/*.tscn`（PackedScene），
-  每处实例化 + 按实例覆盖文本——真正的 prefab 复用，不是 inline 复制。**可选，
-  默认关**。
+  每处实例化 + 按实例覆盖文本——真正的 prefab 复用，不是 inline 复制。**本项目
+  默认启用**（命令里总带上），用户明确说不要时才去掉。
 - `--ai-name`：用 `claude` 看图给组件起有意义的名（见上方命名说明）。**可选，
   默认关**；和 `--prefabs` 一起用最值——组件场景/sprite 名都变可读。
 - `--wait MS`：等页面 JS 渲染完（Babel-in-browser 的 React 给 2500~5000ms）。
