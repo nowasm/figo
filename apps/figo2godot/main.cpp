@@ -428,7 +428,13 @@ struct Converter {
     // per-instance avatar/thumb) so same-component instances differing only in
     // their sprite still group — the differing sprite becomes an instance
     // override. Plain sig() keeps the ref (pixel-identical grouping).
-    std::string sig(const Node& n, bool struct_ = false) const {
+    // maxDepth caps recursion: at depth 0 a child is emitted by its bare type
+    // (+compType) only, not its subtree. slotKey() uses a SHALLOW sig so a slot
+    // matches across deep state changes (a vote card whose voter list / badge
+    // differs a couple nodes down) while still distinguishing structurally
+    // different immediate shapes (a plain vs a selected segment). groupKey() keeps
+    // the full-depth sig (maxDepth<0) for prefab grouping.
+    std::string sig(const Node& n, bool struct_ = false, int maxDepth = -1) const {
         std::string s = std::to_string((int)n.type);
         if (n.type == NodeType::Text) {
             // struct_ ignores font size too (a heading vs label of the same
@@ -468,7 +474,10 @@ struct Converter {
             if (!struct_ && c->type != NodeType::Text)
                 s += "@" + std::to_string((int)std::lround(c->relativeTransform.m02)) + "," +
                      std::to_string((int)std::lround(c->relativeTransform.m12));
-            s += sig(*c, struct_) + ";";
+            if (maxDepth == 0)
+                s += std::to_string((int)c->type) + (c->compType.empty() ? "" : "c" + c->compType) + ";";
+            else
+                s += sig(*c, struct_, maxDepth < 0 ? -1 : maxDepth - 1) + ";";
         }
         s += "}";
         return s;
@@ -499,7 +508,16 @@ struct Converter {
     // counterpart and otherwise hides. Sibling look-alikes (two dots) collide on
     // key but are consumed in order by the matcher below.
     std::string slotKey(const Node& n) const {
-        return (n.compType.empty() ? "" : "c:" + n.compType + "|") + sig(n, true);
+        const std::string pre = n.compType.empty() ? "" : "c:" + n.compType + "|";
+        // A CONTAINER (has children) matches by role/type ALONE — its innards are
+        // aligned recursively and hidden/added, so the same slot matches across
+        // state changes (a vote card whose voter list / badge differs a few nodes
+        // down still maps to the prefab; differently-built segments don't get
+        // hide+added and overlap). Position (matchInst's tiebreak) disambiguates
+        // same-type siblings. A LEAF keeps its own shape so a plain vs highlighted
+        // segment bg, or an icon vs a label, stay distinct slots.
+        if (!n.children.empty()) return pre + "C" + std::to_string((int)n.type);
+        return pre + sig(n, true, 0);
     }
     // Match-quality gate: how well a state variant aligns with the prefab canon.
     // Counts canon children that find a same-slotKey instance child (the same
