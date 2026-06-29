@@ -6,6 +6,7 @@
 //   node html2godot.js <url|file.html> --out <godotDir>
 //        [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--root SEL]
 //        [--viewport WxH] [--wait MS] [--browser msedge|chrome] [--figo2godot <exe>]
+//        [--prefabs] [--prefab-anon]
 //
 // --states reaches screens behind a window.__nav hook; --flows captures
 // click-driven popups/overlays (a JSON array of captures with interaction steps).
@@ -24,7 +25,7 @@ function arg(name, def) {
 const input = process.argv[2];
 const out = arg('--out', null);
 if (!input || input.startsWith('-') || !out) {
-  console.error('usage: html2godot <url|file.html> --out <godotDir> [--states ...] [--flows FILE] [--fonts DIR] [--root SEL] [--viewport WxH] [--wait MS] [--browser ...] [--prefabs] [--ai-name] [--figo2godot <exe>]');
+  console.error('usage: html2godot <url|file.html> --out <godotDir> [--states ...] [--flows FILE] [--fonts DIR] [--root SEL] [--viewport WxH] [--wait MS] [--browser ...] [--prefabs] [--prefab-anon] [--ai-name] [--figo2godot <exe>]');
   process.exit(2);
 }
 
@@ -63,6 +64,7 @@ console.log('=== figo2godot ===');
 const f2gArgs = [canvas, path.resolve(out)];
 if (fonts) f2gArgs.push('--fonts', fonts);
 if (process.argv.includes('--prefabs')) f2gArgs.push('--prefabs');
+if (process.argv.includes('--prefab-anon')) f2gArgs.push('--prefab-anon');  // also dedupe repeated ANONYMOUS containers (implies --prefabs)
 const noPrefab = arg('--no-prefab', null);  // comma list of generic wrapper component types to inline
 if (noPrefab) f2gArgs.push('--no-prefab', noPrefab);
 execFileSync(figo2godot, f2gArgs, { stdio: 'inherit' });

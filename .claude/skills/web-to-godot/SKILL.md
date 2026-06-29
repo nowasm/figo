@@ -41,7 +41,7 @@ fill——和"矢量→贴图"目标一致。
 ```
 node tools/web2canvas/html2godot.js <url|file.html> --out <godotDir> --prefabs \
      [--states "a,b,c"] [--flows FILE] [--fonts DIR] [--root SEL] [--viewport WxH] \
-     [--wait MS] [--ai-name] [--browser msedge|chrome] [--figo2godot <exe>]
+     [--wait MS] [--ai-name] [--prefab-anon] [--browser msedge|chrome] [--figo2godot <exe>]
 ```
 > **本项目约定：`--prefabs` 默认启用**——跑这条命令时总是带上 `--prefabs`，
 > 除非用户明确说不要 prefab。
@@ -72,9 +72,16 @@ node tools/web2canvas/html2godot.js <url|file.html> --out <godotDir> --prefabs \
   再测量，figo2godot 把字体绑进 `theme_override_fonts`。
 - `--prefabs`：把重复组件（卡片/按钮/行）抽成 `components/*.tscn`（PackedScene），
   每处实例化 + 按实例覆盖文本——真正的 prefab 复用，不是 inline 复制。**本项目
-  默认启用**（命令里总带上），用户明确说不要时才去掉。
+  默认启用**（命令里总带上），用户明确说不要时才去掉。同一 React 组件的**不同
+  状态变体合并成一个预制体**（在线/离线/淘汰的玩家行 → 一个 PlayerRow，缺的子节点
+  隐藏、独有的追加），对齐太差的变体（选项集不同的分段控件等）自动内联保真。
+  只被别处嵌套使用、从不在帧里单独实例化的组件不生成 .tscn（避免死文件）。
+- `--prefab-anon`：在 `--prefabs` 基础上，**任何重复>1 的匿名容器**（没有 React
+  组件名的 `div`/`span` 包裹层）也按结构抽成预制体——"重复就复用"。可选、默认关，
+  因为会产出较多 `Group_N`（中文文案无法转成名字时的兜底名），**和 `--ai-name`
+  一起用**最好（给这些 Group 起可读名）。只在确实想最大化代码复用时开。
 - `--ai-name`：用 `claude` 看图给组件起有意义的名（见上方命名说明）。**可选，
-  默认关**；和 `--prefabs` 一起用最值——组件场景/sprite 名都变可读。
+  默认关**；和 `--prefabs`/`--prefab-anon` 一起用最值——组件场景/sprite 名都变可读。
 - `--wait MS`：等页面 JS 渲染完（Babel-in-browser 的 React 给 2500~5000ms）。
 - `--flows FILE`：采**点击触发的弹窗/overlay**（`--states` 只能到 `__nav` 的
   screen 级）。FILE 是 JSON 数组，每个 capture 可选 `nav`（先导航），再跑
