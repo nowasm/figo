@@ -469,20 +469,53 @@ struct Converter {
         return s;
     }
 
-    // Grouping key for prefab extraction: a source component (web2canvas compType
-    // on its root) groups by TYPE + structural sig, so all instances of the type
-    // collapse to one prefab (sprite/text differences become per-instance
-    // overrides). Non-component containers fall back to a pixel-exact sig.
+    // Grouping key for prefab extraction. A source component (web2canvas / hand-
+    // authored compType) groups by TYPE + a COARSE outer-size bucket ONLY — the
+    // structural sig is intentionally NOT in the key. Same compType = same React
+    // component, so ALL of its state variants (an online vs offline vs eliminated
+    // player row differing only by an optional dot/badge child) collapse to ONE
+    // prefab: the canon is the superset instance and a leaner variant hides the
+    // children it lacks (see emitInstanceOverrides). The size bucket still splits
+    // a component instanced at a very different OUTER size (MenuChatBar 660 vs
+    // 840), whose non-uniform flex reflow per-child offset overrides can't
+    // reproduce. Anonymous (no-compType) containers keep a pixel/structural key;
+    // phase 1 never extracts them, but the key stays stable.
     std::string groupKey(const Node& n) const {
-        // Group by source-component TYPE + a COARSE root-size bucket + structural
-        // shape. Content (text/color/image) and inner sizes are ignored → those
-        // become per-instance overrides, so same-size instances of a type collapse
-        // to one prefab (RoomThumb cards). But an instance used at a very different
-        // OUTER size (MenuChatBar at 660 vs 840) reflows its flex children non-
-        // uniformly, which per-child offset overrides can't fully reproduce — the
-        // size bucket keeps those as separate, each-correct variants.
         const int wb = (int)std::lround(n.width) / 64, hb = (int)std::lround(n.height) / 64;
-        return n.compType + "|" + std::to_string(wb) + "x" + std::to_string(hb) + "|" + sig(n, true);
+        if (!n.compType.empty())
+            return n.compType + "|" + std::to_string(wb) + "x" + std::to_string(hb);
+        return "|" + std::to_string(wb) + "x" + std::to_string(hb) + "|" + sig(n, true);
+    }
+    // Slot identity for matching a child across a component's state variants:
+    // the React role (compType) when present, then the PURE structural shape
+    // (sig with struct_=true ignores text/color/image/size). The same slot keeps
+    // its shape across states, so it matches; an optional badge present in one
+    // variant and absent in another has a unique shape, so it matches only its
+    // counterpart and otherwise hides. Sibling look-alikes (two dots) collide on
+    // key but are consumed in order by the matcher below.
+    std::string slotKey(const Node& n) const {
+        return (n.compType.empty() ? "" : "c:" + n.compType + "|") + sig(n, true);
+    }
+    // Match-quality gate: how well a state variant aligns with the prefab canon.
+    // Counts canon children that find a same-slotKey instance child (the same
+    // greedy matching emitInstanceOverrides uses). A variant is a POOR FIT when
+    // it would reuse less than ~60% of the canon's top-level children OR less
+    // than ~60% of its own — i.e. most of the prefab gets hidden and most of the
+    // instance gets newly added (a segmented control whose option set diverges
+    // from the canon's). Such an instance is better emitted inline than forced
+    // onto the prefab, where mismatched children stack and overlap. The canon
+    // matches itself fully, so it is never a poor fit.
+    bool poorFit(const Node& canon, const Node& inst) const {
+        const size_t cc = canon.children.size(), ic = inst.children.size();
+        if (cc == 0) return false;
+        std::vector<char> usedI(ic, 0);
+        size_t matched = 0;
+        for (const auto& cch : canon.children) {
+            const std::string key = slotKey(*cch);
+            for (size_t j = 0; j < ic; ++j)
+                if (!usedI[j] && slotKey(*inst.children[j]) == key) { usedI[j] = 1; ++matched; break; }
+        }
+        return matched * 5 < cc * 3 || (ic > 0 && matched * 5 < ic * 3);
     }
     // First visible image-fill ref of a node (empty if none).
     static std::string imageRefOf(const Node& n) {
@@ -524,7 +557,12 @@ struct Converter {
     const Comp* extractedComponent(const Node& n) {
         if (!prefabs || inComponent || n.children.empty() || n.type == NodeType::Text) return nullptr;
         auto it = compBySig.find(groupKey(n));
-        return (it != compBySig.end() && it->second.extracted) ? &it->second : nullptr;
+        if (it == compBySig.end() || !it->second.extracted) return nullptr;
+        // Match-quality guard: a variant that aligns poorly with the canon is
+        // emitted inline rather than forced onto the prefab (which would hide
+        // most of the prefab and stack this instance's mismatched children).
+        if (poorFit(*it->second.canon, n)) return nullptr;
+        return &it->second;
     }
 
     // per-frame state
@@ -1247,10 +1285,14 @@ struct Converter {
         body += "offset_bottom = " + num(ic.relativeTransform.m12 + ic.height) + "\n";
     }
     // Per-instance overrides vs the canon. The grouping key includes the
-    // structural shape, so canon and instance have the SAME child sequence —
-    // children align by index. Each differing leaf gets the override it needs:
-    // offset/size, text, font color, solid fill color, or a re-baked texture.
-    void emitInstanceOverrides(const Node& canon, const Node& inst, const std::string& parentPath) {
+    // structural shape, but state variants of one component differ in WHICH
+    // children they have, so canon and instance no longer share a child sequence.
+    // Children are matched by slot identity (slotKey): a matched leaf gets the
+    // override it needs (offset/size, text, font color, solid fill, re-baked
+    // texture); a canon-only slot is HIDDEN in this state; an instance-only slot
+    // (phase 2) is ADDED to this instance as a fresh node. Net effect: ONE prefab
+    // (the superset canon) realizes every state via per-instance toggles + adds.
+    void emitInstanceOverrides(const Node& canon, Node& inst, const std::string& parentPath) {
         std::map<std::string, int> used;
         used["__bg"] = 1;
         // A container's solid background is a `__bg` ColorRect; override its color.
@@ -1260,8 +1302,38 @@ struct Converter {
                 body += "\n[node name=\"__bg\" parent=\"" + parentPath + "\"]\n";
                 body += "color = " + paintLit(*ib) + "\n";
             }
-        const size_t cnt = std::min(canon.children.size(), inst.children.size());
-        for (size_t i = 0; i < cnt; ++i) {
+        // Match each canon child to an instance child by slot identity, not by
+        // index: once state variants share one prefab, a leaner instance is
+        // missing some canon children and index alignment shifts everything after
+        // the gap. A canon child with no instance match is HIDDEN (the state
+        // toggle). Iterate ALL canon children in order so the generated node names
+        // line up exactly with emitComponentScene()'s emit() (which names by the
+        // running child index), keeping the override [node] paths valid.
+        std::vector<char> instUsed(inst.children.size(), 0);
+        auto matchInst = [&](const Node& cc) -> Node* {
+            const std::string key = slotKey(cc);
+            // Among unused instance children of the same slot class, take the one
+            // POSITIONALLY nearest to the canon child. Identical-shape repeated
+            // siblings (segmented-control options, grid cells) share a slotKey;
+            // without the position tiebreak they pair by source/DOM order, which
+            // need not be the visual order — pairing the canon's left segment to
+            // the instance's first-in-DOM (maybe rightmost) segment and then
+            // repositioning collapses two labels onto one spot. Nearest-position
+            // pairing keeps each sibling at its own slot.
+            int best = -1;
+            float bestD = 0;
+            for (size_t j = 0; j < inst.children.size(); ++j) {
+                if (instUsed[j] || slotKey(*inst.children[j]) != key) continue;
+                const Node& c = *inst.children[j];
+                const float d = std::fabs(c.relativeTransform.m02 - cc.relativeTransform.m02) +
+                                std::fabs(c.relativeTransform.m12 - cc.relativeTransform.m12);
+                if (best < 0 || d < bestD) { best = (int)j; bestD = d; }
+            }
+            if (best < 0) return nullptr;
+            instUsed[best] = 1;
+            return inst.children[(size_t)best].get();
+        };
+        for (size_t i = 0; i < canon.children.size(); ++i) {
             const Node& cc = *canon.children[i];
             std::string fb = "Node" + std::to_string(i);
             std::string base = sanitizeName(cc.name, fb.c_str());
@@ -1269,7 +1341,17 @@ struct Converter {
             int k = 2;
             while (used.count(uniq)) uniq = base + "_" + std::to_string(k++);
             used[uniq] = 1;
-            const Node& ic = *inst.children[i];
+            Node* icp = matchInst(cc);
+            if (!icp) {
+                // Canon carries this child, this instance/state doesn't -> hide it.
+                // (If the canon child is already hidden there's nothing to do.)
+                if (cc.visible) {
+                    body += "\n[node name=\"" + uniq + "\" parent=\"" + parentPath + "\"]\n";
+                    body += "visible = false\n";
+                }
+                continue;
+            }
+            Node& ic = *icp;
             const bool posDiff =
                 std::lround(cc.width) != std::lround(ic.width) ||
                 std::lround(cc.height) != std::lround(ic.height) ||
@@ -1316,6 +1398,29 @@ struct Converter {
                 }
                 emitInstanceOverrides(cc, ic, parentPath + "/" + uniq);
             }
+        }
+
+        // Phase 2 — instance-only slots: children THIS state has that the superset
+        // canon lacks (an "eliminated" overlay / a slider track in a row whose
+        // canon is the toggle variant). Phase 1 dropped them; emit each now as an
+        // ADDED node under this instance via the normal emit() path. We're inside a
+        // FRAME render (convertFrame already rendered inst's frame), so the node's
+        // absoluteTransform/fills bake correctly — unlike grafting it into the
+        // component scene, which renders a different frame. Names are deduped
+        // against the canon children at this level (and emit()'s reserved __bg) so
+        // the added node can't collide with — and thus silently re-target — an
+        // existing prefab node. pw/ph = inst's box, since inst is these nodes' parent.
+        for (size_t j = 0; j < inst.children.size(); ++j) {
+            if (instUsed[j]) continue;
+            Node& extra = *inst.children[j];
+            if (!extra.visible) continue;  // a hidden-in-source extra adds nothing
+            std::string fb = "Add" + std::to_string(j);
+            std::string base = sanitizeName(extra.name, fb.c_str());
+            std::string uniq = base;
+            int k = 2;
+            while (used.count(uniq)) uniq = base + "_" + std::to_string(k++);
+            used[uniq] = 1;
+            emit(extra, parentPath, uniq, inst.width, inst.height);
         }
     }
 
