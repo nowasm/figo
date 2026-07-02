@@ -87,6 +87,14 @@ public:
     bool measureText(const Node& node, float maxWidth, float& outWidth,
                      float& outHeight);
 
+    // Resolves (family, weight, italic) through the same lookup used for
+    // text drawing and reports the lowercased family actually used. Returns
+    // false when no font could be loaded at all. FigmaUI::diagnostics()
+    // compares the result against the requested family to detect silent
+    // font fallback.
+    bool resolveFontFamily(const std::string& family, int weight, bool italic,
+                           std::string& outFamily);
+
     // Fonts: explicit registration wins over system lookup (Windows registry).
     void registerFont(const std::string& family, const std::string& ttfPath,
                       int weight = 400, bool italic = false);

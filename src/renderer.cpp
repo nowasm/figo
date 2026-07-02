@@ -319,6 +319,16 @@ uint32_t Renderer::width() const { return impl_->width; }
 uint32_t Renderer::height() const { return impl_->height; }
 Mat23 Renderer::contentTransform() const { return impl_->contentTransform(); }
 
+bool Renderer::resolveFontFamily(const std::string& family, int weight, bool italic,
+                                 std::string& outFamily) {
+    // fontKeyFor caches loads, so repeated diagnostic queries are cheap. The
+    // key's first '|'-segment is the lowercased family it resolved to.
+    const std::string key = impl_->fonts.fontKeyFor(family, weight, italic);
+    if (key.empty()) return false;
+    outFamily = key.substr(0, key.find('|'));
+    return true;
+}
+
 void Renderer::registerFont(const std::string& family, const std::string& ttfPath,
                             int weight, bool italic) {
     impl_->fonts.registerFont(family, ttfPath, weight, italic);

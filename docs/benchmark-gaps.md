@@ -27,7 +27,7 @@ opacity 等还是只写属性）；运行时无结构化诊断（字体缺失静
 | G5 | 手势与事件面 | 6 | ~~长按、swipe、onScroll、滚动位置读取、事件坐标~~ **部分修复(2026-07)**：`ui.onLongPress`（按住≥0.5s 不动，消费 click）、`ui.onSwipe`（水平 v1，"left"/"right"，位移≥60px 且 \|dx\|>2\|dy\| 且 <0.5s；被水平 drag-scroll 消费的不派发，垂直列表上的横扫仍算——滑动删除可做）、`ui.onScroll`（滚轮/拖拽/惯性/setScroll 全路径，同帧合并、每帧派发）；节点补 `scrollX/scrollY`（可读写）+ `maxScrollX/maxScrollY`；onClick/onHover/onLongPress 回调追加 viewport 坐标 `(node, x, y)`；测试原语 `ui.longPress` / `ui.pointerDown/Move/Up`。派发全走 structureRev/frame 守卫。回归基准 `examples/apps/_events_regress/`。**仍缺**：双击、捏合、多点触控、拖拽(drag&drop)、下拉刷新语义 | `ui.cpp` stepLongPress/maybeFireSwipe/dispatchScrollEvents；`figo_raylib.cpp:77-85` 仍只投单指针 |
 | G6 | 动态媒体 | 4 | 音频播放（raylib 有能力未接线）、视频、GIF 动图、Lottie（wasm sjlj 限制已知） | `scene_builder.cpp:250-292`；loaders 仅 svg,ttf,png,jpg,webp |
 | G7 | JS 属性/查询面 | 横切 | ~~visible/opacity/primarySizing 只写不可读~~ **部分修复(2026-07)**：visible/opacity/primarySizing/primaryAlign 补了 getter，新增只读 width/height。仍缺：位置(x/y)、颜色/样式读写、建/删节点 | `script_host.cpp` nodeGet |
-| G8 | 运行时诊断 | 横切 | 布局溢出/文本截断/字体缺失无警告（font_provider 静默回退，0 输出）；无机器可读诊断通道。直接决定 AI 迭代效率 | `font_provider.cpp:521,541` |
+| G8 | 运行时诊断 | 横切 | ~~布局溢出/文本截断/字体缺失无警告；无机器可读诊断通道~~ **v1 已实现(2026-07)**：`FigmaUI::diagnostics()` 按需遍历当前 frame，输出 `{kind, node, id, message}`——`font-fallback`（请求字族解析失败被静默替换，按渲染同一条 lookup 复算）、`text-overflow`（按渲染同一 wrap pass 复测，超出 >0.3 行才报；authored TRUNCATE/ellipsis 跳过）、`node-overflow`（可见子节点越出 clipsContent 父边界；滚动容器的滚动轴豁免）。JS 侧 `ui.diagnostics()`；figoplay `--shot` 顺带写 `<shot>.diagnostics.json`（空数组=干净）+ stderr 摘要。**仍归设计时 audit_design 管**：对比度/离色板/字阶检查 | `ui.cpp` diagnostics、`renderer.cpp` resolveFontFamily |
 | G9 | 数据层 | 横切 | localStorage 之外无结构化存储；无 BaaS 绑定（目标：`ui.bindList` 接远程数据源） | `script_host.cpp:807-834` |
 | G10 | 事件派发中改树 | 横切 | ~~onClick 处理器里调 bindList 是 UB~~ **已修复(2026-07)**：Impl 加 `structureRev`，bindList/setVariant 递增；`fireUp` 在结构变更后立即停止冒泡（同导航消费事件的语义），`pointerUp` 原型链走查与 `pointerMove` 悬空 hit 同步加守卫。注意：处理器**自己的 node 参数**在调 bindList 后仍失效（文档已有约定），需要时重新 find | `ui.cpp` fireUp/bindList/setVariant |
 | G11 | 名字寻址不跨页 | 横切 | ~~按名 mutation 只搜当前 frame~~ **已修复(2026-07)**：`findMutable` 与 `findNode` 对齐——当前 frame 优先、回落全文档，跨页 setText/setVisible 生效 | `ui.cpp` findMutable |
@@ -74,9 +74,9 @@ opacity 等还是只写属性）；运行时无结构化诊断（字体缺失静
    多点触控仍缺）。
 4. **G7 属性面补读**：把只写属性补成可读、暴露几何——小活，随手做，
    AI 自验强依赖（读不到状态就只能截图猜）。
-5. **G8 运行时诊断**：字体缺失/文本截断/布局溢出输出结构化警告
-   （`--shot` 时顺带落一个 diagnostics.json）。投入小、对"AI 一次做成率"
-   杠杆大。
+5. ~~**G8 运行时诊断**：字体缺失/文本截断/布局溢出输出结构化警告
+   （`--shot` 时顺带落一个 diagnostics.json）~~ **v1 已实现(2026-07)**，
+   见上表 G8 行（对比度/离色板等设计时检查仍走 audit_design）。
 6. **G3 控件语义**：不做内建控件，走"变体 + 值绑定"路线：给 setVariant
    补自动状态（pressed/hover）与过渡，加 `ui.bindValue`（slider/switch 的
    连续值/布尔映射到变体或几何）。日期/时间选择器做成官方组件模板

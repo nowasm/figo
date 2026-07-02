@@ -32,6 +32,11 @@
 //   ui.setVariant(name, property, value)         ui.setScroll(name, x, y)
 //   ui.setEditable(name, editable?)    ui.focusText(name)    ui.blur()
 //   ui.find(name) -> node|null         ui.findAll(name) -> [node]
+//   ui.diagnostics() -> [{kind, node, id, message}]  // render problems in the
+//     current frame a screenshot doesn't explain: kind = "font-fallback"
+//     (requested family missing, silently substituted), "text-overflow"
+//     (laid-out text exceeds its box) or "node-overflow" (visible child
+//     clipped by a clipsContent parent; scroll axes exempt). [] = clean.
 //   ui.tap(nameOrNode) -> bool         // synthesized click at the node center
 //   ui.longPress(nameOrNode) -> bool   // synthesized long press (one tick)
 //   ui.pointerDown/pointerMove/pointerUp(x, y)  // raw pointer feed for

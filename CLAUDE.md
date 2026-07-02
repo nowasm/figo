@@ -76,6 +76,9 @@ Set-Content build\bw.cmd $bat -Encoding ascii; cmd /c "<repo>\build\bw.cmd"; Rem
    - `setTimeout/setInterval`（app 时间）、`fetch()`（Promise）、`localStorage`（持久化到
      `<script>.storage.json`）
 3. **验证**：`figoplay.exe design.fig app.js --shot out.png` 后 Read 截图；
+   `--shot` 同时写 `out.diagnostics.json`（字体回退/文本截断/clipsContent 裁切的
+   结构化警告，空数组=干净；脚本内 `ui.diagnostics()` 直查）——截图"看起来不对
+   但不知道为什么"先看这里。
    交互验证参考 `examples/scripts/wallet.js` 的 SELFDRIVE 模式（`ui.tap` 合成点击 +
    `--selfdrive` 前缀截图）。figoplay 运行中改 .js 会热重载，脚本需可重入
    （重跑一遍应幂等）。

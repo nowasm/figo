@@ -1099,6 +1099,23 @@ JSValue ui_findAll(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     return arr;
 }
 
+// Render diagnostics for the current frame (font fallback, text overflow,
+// clipped children) as [{kind, node, id, message}]. Empty array = clean.
+JSValue ui_diagnostics(JSContext* ctx, JSValueConst, int, JSValueConst*) {
+    auto* im = ScriptHost::Impl::from(ctx);
+    JSValue arr = JS_NewArray(ctx);
+    uint32_t i = 0;
+    for (const auto& d : im->ui.diagnostics()) {
+        JSValue o = JS_NewObject(ctx);
+        JS_SetPropertyStr(ctx, o, "kind", JS_NewString(ctx, d.kind.c_str()));
+        JS_SetPropertyStr(ctx, o, "node", JS_NewString(ctx, d.nodeName.c_str()));
+        JS_SetPropertyStr(ctx, o, "id", JS_NewString(ctx, d.nodeId.c_str()));
+        JS_SetPropertyStr(ctx, o, "message", JS_NewString(ctx, d.message.c_str()));
+        JS_SetPropertyUint32(ctx, arr, i++, o);
+    }
+    return arr;
+}
+
 // Resolve argv[0] (node object or name) and compute the node's on-screen
 // center in viewport coordinates. Returns nullptr when not found (out params
 // untouched); throws only on bad argument types.
@@ -1375,6 +1392,7 @@ ScriptHost::ScriptHost(FigmaUI& ui) : impl_(std::make_unique<Impl>(ui)) {
     fn("markDirty", ui_markDirty, 0);
     fn("find", ui_find, 1);
     fn("findAll", ui_findAll, 1);
+    fn("diagnostics", ui_diagnostics, 0);
     fn("tap", ui_tap, 1);
     fn("longPress", ui_longPress, 1);
     auto fnMagic = [&](const char* name, int magic) {

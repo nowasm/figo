@@ -16,6 +16,21 @@
 
 namespace figo {
 
+// One machine-readable warning from FigmaUI::diagnostics(). kind is one of:
+//   "font-fallback" — a TEXT node's requested font family could not be
+//                     resolved and rendering silently substituted another
+//                     family (or nothing loaded at all)
+//   "text-overflow" — a TEXT node's laid-out content exceeds its box (lines
+//                     are cut off / a non-wrapping line runs past the width)
+//   "node-overflow" — a visible child sticks out of a clipsContent parent,
+//                     so part of it is clipped away
+struct Diagnostic {
+    std::string kind;
+    std::string nodeName;
+    std::string nodeId;
+    std::string message;  // human-readable detail (requested vs actual, px amounts)
+};
+
 class FigmaUI {
 public:
     // Event coordinates are viewport/pixel-space (the same space the pointer
@@ -199,6 +214,16 @@ public:
     bool setVisible(const std::string& nodeName, bool visible);
     bool setOpacity(const std::string& nodeName, float opacity);  // <0 resets to authored
     bool setText(const std::string& nodeName, const std::string& text);
+
+    // ---- Diagnostics ----
+    // Walks the current frame's visible subtree and reports render problems a
+    // screenshot doesn't explain: silent font fallback, truncated/overflowing
+    // text, and content clipped away by a clipsContent parent. Computed on
+    // demand (no persistent state); empty = the frame renders clean. Scroll
+    // containers legitimately overflow along their scroll axes — those axes
+    // are not reported. Scripts read this via ui.diagnostics(); figoplay
+    // --shot writes it next to the screenshot as <shot>.diagnostics.json.
+    std::vector<Diagnostic> diagnostics() const;
 
     // Switch an INSTANCE to a sibling variant of its component set, e.g.
     // setVariant("btn-start", "State", "Hover") finds the variant whose name

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <map>
@@ -1276,6 +1277,139 @@ bool FigmaUI::setText(const std::string& nodeName, const std::string& text) {
     impl_->reflow();  // auto-height text can change the layout around it
     impl_->renderer.markDirty();
     return true;
+}
+
+namespace {
+
+std::string lowerAscii(std::string s) {
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+std::string px(float v) {
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%.1f", v);
+    return buf;
+}
+
+}  // namespace
+
+std::vector<Diagnostic> FigmaUI::diagnostics() const {
+    std::vector<Diagnostic> out;
+    Node* frame = impl_->frame;
+    if (!frame) return out;
+    Renderer& renderer = impl_->renderer;
+    constexpr float kTol = 1.0f;  // px slack for AA / rounding noise
+
+    auto add = [&](const char* kind, const Node& n, std::string message) {
+        out.push_back({kind, n.name, n.id, std::move(message)});
+    };
+
+    std::function<void(Node&)> walk = [&](Node& n) {
+        if (!n.effectivelyVisible()) return;
+
+        if (n.type == NodeType::Text && !n.characters.empty()) {
+            // font-fallback: resolve every requested (family, weight, italic)
+            // the way rendering does and compare the family it landed on.
+            std::vector<std::string> seen;
+            auto checkFont = [&](const TextStyle& ts) {
+                const std::string want = lowerAscii(ts.fontFamily);
+                const std::string sig =
+                    want + "|" + std::to_string(ts.fontWeight) + (ts.italic ? "|i" : "");
+                if (std::find(seen.begin(), seen.end(), sig) != seen.end()) return;
+                seen.push_back(sig);
+                std::string got;
+                if (!renderer.resolveFontFamily(ts.fontFamily, ts.fontWeight, ts.italic,
+                                                got)) {
+                    add("font-fallback", n,
+                        "font \"" + ts.fontFamily + "\" not found and no substitute "
+                        "could be loaded -- text may not render");
+                } else if (got != want) {
+                    add("font-fallback", n,
+                        "font \"" + ts.fontFamily + "\" not found; rendered with \"" +
+                            got + "\"");
+                }
+            };
+            checkFont(n.textStyle);
+            for (const auto& run : n.textRuns) checkFont(run.style);
+
+            // text-overflow: re-measure with the exact wrap pass rendering
+            // uses and compare against the box. Authored truncation
+            // (TRUNCATE / textTruncation: ENDING) clips by design — skip it.
+            const TextStyle& ts = n.textStyle;
+            if (ts.autoResize != "TRUNCATE" && !ts.truncateEnding) {
+                const bool noWrap = ts.autoResize == "WIDTH_AND_HEIGHT" || n.width <= 0;
+                float tw = 0, th = 0;
+                if (renderer.measureText(n, noWrap ? 0.0f : n.width, tw, th)) {
+                    // A few px of line-box overhang is routine (actual font
+                    // metrics vs the authored box) and TEXT nodes don't
+                    // self-clip; only flag when a meaningful slice of a line
+                    // falls outside the box.
+                    const float lineH =
+                        ts.lineHeightPx > 0 ? ts.lineHeightPx : ts.fontSize * 1.2f;
+                    const float slack = std::max(kTol, 0.3f * lineH);
+                    if (th > n.height + slack) {
+                        add("text-overflow", n,
+                            "text needs " + px(th) + "px of height but the box is " +
+                                px(n.height) + "px -- bottom line(s) are cut off");
+                    } else if (tw > n.width + std::max(kTol, 0.3f * ts.fontSize)) {
+                        add("text-overflow", n,
+                            "text line is " + px(tw) + "px wide but the box is " +
+                                px(n.width) + "px -- text runs past the box");
+                    }
+                }
+            }
+        }
+
+        // node-overflow: visible children sticking out of a clipsContent
+        // parent get their pixels cut. A scrolling frame overflows its scroll
+        // axes by design, so those axes are exempt.
+        if (n.clipsContent && n.width > 0 && n.height > 0) {
+            const bool skipX = n.scrollDirection == ScrollDirection::Horizontal ||
+                               n.scrollDirection == ScrollDirection::Both;
+            const bool skipY = n.scrollDirection == ScrollDirection::Vertical ||
+                               n.scrollDirection == ScrollDirection::Both;
+            for (const auto& childPtr : n.children) {
+                Node& c = *childPtr;
+                if (!c.effectivelyVisible() || (c.width <= 0 && c.height <= 0)) continue;
+                // Child bounding box in parent-local coordinates.
+                float minX = 0, minY = 0, maxX = 0, maxY = 0;
+                const float corners[4][2] = {
+                    {0, 0}, {c.width, 0}, {0, c.height}, {c.width, c.height}};
+                for (int i = 0; i < 4; ++i) {
+                    float x, y;
+                    c.relativeTransform.apply(corners[i][0], corners[i][1], x, y);
+                    minX = i == 0 ? x : std::min(minX, x);
+                    maxX = i == 0 ? x : std::max(maxX, x);
+                    minY = i == 0 ? y : std::min(minY, y);
+                    maxY = i == 0 ? y : std::max(maxY, y);
+                }
+                std::string parts;
+                auto over = [&](float amount, const char* edge) {
+                    if (amount <= kTol) return;
+                    if (!parts.empty()) parts += ", ";
+                    parts += px(amount) + "px past the " + edge + " edge";
+                };
+                if (!skipX) {
+                    over(-minX, "left");
+                    over(maxX - n.width, "right");
+                }
+                if (!skipY) {
+                    over(-minY, "top");
+                    over(maxY - n.height, "bottom");
+                }
+                if (!parts.empty()) {
+                    add("node-overflow", c,
+                        "extends " + parts + " of clipping parent \"" + n.name +
+                            "\" -- the overhang is clipped away");
+                }
+            }
+        }
+
+        for (const auto& child : n.children) walk(*child);
+    };
+    walk(*frame);
+    return out;
 }
 
 namespace {

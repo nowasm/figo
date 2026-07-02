@@ -41,7 +41,9 @@ def run_app(app_dir: Path, shots_dir: Path) -> tuple[str, str]:
     try:
         proc = subprocess.run(
             [str(EXE), str(app_dir), "--selfdrive", app_dir.name],
-            capture_output=True, text=True, timeout=120, cwd=str(shots_dir))
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=120, cwd=str(shots_dir))  # figoplay prints UTF-8; the
+            # locale codec (GBK on zh-CN Windows) chokes on CJK bench output
     except subprocess.TimeoutExpired:
         return "TIMEOUT", ""
     out = proc.stdout + proc.stderr

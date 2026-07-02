@@ -82,6 +82,8 @@ int main(int argc, char** argv) {
     // 2/3 of the pointer position (hitting the wrong element).
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(420, 900, "wallet — a Figma file running as an app");
+    SetTargetFPS(60);  // VSYNC_HINT alone is driver-optional; uncapped breaks
+                       // the selfdrive tour's frame-count assumptions
 
     auto ui = figo::FigmaUI::fromFile(input);
     ui->setResizeMode(figo::FigmaUI::ResizeMode::Reflow);

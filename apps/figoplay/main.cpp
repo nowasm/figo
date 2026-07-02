@@ -11,8 +11,10 @@
 // next to the script as <script>.storage.json.
 // Verification exits (for AI / CI loops):
 //   --shot out.png [--frames N]  render N frames (default 30), save a
-//                                screenshot, quit. The script can stage state
-//                                first (globalThis.SHOT is defined).
+//                                screenshot plus out.diagnostics.json (render
+//                                diagnostics; [] = clean), quit. The script
+//                                can stage state first (globalThis.SHOT is
+//                                defined).
 //   --selfdrive prefix           the script drives its own tour (SELFDRIVE is
 //                                defined); saves <prefix>_home/nav.png.
 //
@@ -24,6 +26,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -170,6 +173,36 @@ struct Player {
         return ok;
     }
 
+    // --shot verification bundle: machine-readable render diagnostics for the
+    // frame just captured, written next to the screenshot as
+    // <shot>.diagnostics.json (an empty array means clean — always written so
+    // callers can tell "clean" from "not checked"). --selfdrive skips this.
+    void writeDiagnostics() {
+        nlohmann::json arr = nlohmann::json::array();
+        std::map<std::string, int> counts;
+        for (const auto& d : ui->diagnostics()) {
+            arr.push_back({{"kind", d.kind},
+                           {"node", d.nodeName},
+                           {"id", d.nodeId},
+                           {"message", d.message}});
+            ++counts[d.kind];
+        }
+        const std::string path = std::filesystem::path(shotPath)
+                                     .replace_extension(".diagnostics.json")
+                                     .string();
+        std::ofstream out(path);
+        out << arr.dump(2) << "\n";
+        if (!arr.empty()) {
+            std::string byKind;
+            for (const auto& [kind, count] : counts) {
+                if (!byKind.empty()) byKind += ", ";
+                byKind += std::to_string(count) + " " + kind;
+            }
+            std::fprintf(stderr, "[figo] %zu diagnostics (%s) -> %s\n", arr.size(),
+                         byKind.c_str(), path.c_str());
+        }
+    }
+
     void tick() {
         // Hot reload: rebuild the script world when the .js changes on disk.
         if (++watchTick >= 20) {  // ~3x per second
@@ -199,6 +232,7 @@ struct Player {
             if (++frame >= shotFrames) {
                 TakeScreenshot(shotPath.c_str());
                 std::printf("[figoplay] screenshot -> %s\n", shotPath.c_str());
+                writeDiagnostics();
                 done = true;
             }
         } else if (drivePrefix) {
@@ -278,6 +312,13 @@ int main(int argc, char** argv) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 #endif
     InitWindow(p->winW, p->winH, "figoplay — design.fig + logic.js");
+#ifndef __EMSCRIPTEN__
+    // FLAG_VSYNC_HINT is only a hint — drivers may ignore it, and an uncapped
+    // loop runs at 1000s of fps, breaking every real-time assumption (script
+    // setInterval pacing, selfdrive frame budgets). Hard-cap as a fallback;
+    // the web build paces via requestAnimationFrame instead.
+    SetTargetFPS(60);
+#endif
 
 #ifdef __ANDROID__
     // The window is up → the activity (and its asset manager) is live.
