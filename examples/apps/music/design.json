@@ -1,0 +1,1538 @@
+{
+ "name": "Music",
+ "document": {
+  "id": "40:0",
+  "name": "Document",
+  "type": "DOCUMENT",
+  "children": [
+   {
+    "id": "40:1",
+    "name": "Page 1",
+    "type": "CANVAS",
+    "children": [
+     {
+      "id": "40:41",
+      "name": "Music",
+      "type": "FRAME",
+      "visible": true,
+      "size": {
+       "x": 420,
+       "y": 900
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "clipsContent": true,
+      "cornerRadius": 0,
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 0.07058823529411765,
+         "g": 0.07058823529411765,
+         "b": 0.07058823529411765,
+         "a": 1.0
+        }
+       }
+      ],
+      "children": [
+       {
+        "id": "40:2",
+        "name": "Kicker",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 200,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          48
+         ]
+        ],
+        "characters": "正在播放",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.7019607843137254,
+           "g": 0.7019607843137254,
+           "b": 0.7019607843137254,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 700,
+         "fontSize": 12,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 1.5
+        }
+       },
+       {
+        "id": "40:15",
+        "name": "Cover",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 300,
+         "y": 300
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          60
+         ],
+         [
+          0,
+          1,
+          76
+         ]
+        ],
+        "clipsContent": true,
+        "cornerRadius": 8,
+        "fills": [],
+        "children": [
+         {
+          "id": "40:5",
+          "name": "Cover1",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 300,
+           "y": 300
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.13725490196078433,
+             "g": 0.2235294117647059,
+             "b": 0.36470588235294116,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:3",
+            "name": "Cover1 Halo",
+            "type": "ELLIPSE",
+            "size": {
+             "x": 120,
+             "y": 120
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              90
+             ],
+             [
+              0,
+              1,
+              90
+             ]
+            ],
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.08
+              }
+             }
+            ]
+           },
+           {
+            "id": "40:4",
+            "name": "Cover1 Abbr",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 300,
+             "y": 44
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              128
+             ]
+            ],
+            "characters": "午夜",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.92
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 700,
+             "fontSize": 24,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 6
+            }
+           }
+          ]
+         },
+         {
+          "id": "40:8",
+          "name": "Cover2",
+          "type": "FRAME",
+          "visible": false,
+          "size": {
+           "x": 300,
+           "y": 300
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.2901960784313726,
+             "g": 0.21568627450980393,
+             "b": 0.16470588235294117,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:6",
+            "name": "Cover2 Halo",
+            "type": "ELLIPSE",
+            "size": {
+             "x": 120,
+             "y": 120
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              90
+             ],
+             [
+              0,
+              1,
+              90
+             ]
+            ],
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.08
+              }
+             }
+            ]
+           },
+           {
+            "id": "40:7",
+            "name": "Cover2 Abbr",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 300,
+             "y": 44
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              128
+             ]
+            ],
+            "characters": "雾中",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.92
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 700,
+             "fontSize": 24,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 6
+            }
+           }
+          ]
+         },
+         {
+          "id": "40:11",
+          "name": "Cover3",
+          "type": "FRAME",
+          "visible": false,
+          "size": {
+           "x": 300,
+           "y": 300
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11764705882352941,
+             "g": 0.23921568627450981,
+             "b": 0.2,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:9",
+            "name": "Cover3 Halo",
+            "type": "ELLIPSE",
+            "size": {
+             "x": 120,
+             "y": 120
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              90
+             ],
+             [
+              0,
+              1,
+              90
+             ]
+            ],
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.08
+              }
+             }
+            ]
+           },
+           {
+            "id": "40:10",
+            "name": "Cover3 Abbr",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 300,
+             "y": 44
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              128
+             ]
+            ],
+            "characters": "环形",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.92
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 700,
+             "fontSize": 24,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 6
+            }
+           }
+          ]
+         },
+         {
+          "id": "40:14",
+          "name": "Cover4",
+          "type": "FRAME",
+          "visible": false,
+          "size": {
+           "x": 300,
+           "y": 300
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.23137254901960785,
+             "g": 0.16470588235294117,
+             "b": 0.2901960784313726,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:12",
+            "name": "Cover4 Halo",
+            "type": "ELLIPSE",
+            "size": {
+             "x": 120,
+             "y": 120
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              90
+             ],
+             [
+              0,
+              1,
+              90
+             ]
+            ],
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.08
+              }
+             }
+            ]
+           },
+           {
+            "id": "40:13",
+            "name": "Cover4 Abbr",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 300,
+             "y": 44
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              128
+             ]
+            ],
+            "characters": "慢速",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 0.92
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 700,
+             "fontSize": 24,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 6
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "40:16",
+        "name": "TrackTitle",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 340,
+         "y": 32
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          396
+         ]
+        ],
+        "characters": "午夜快线",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 700,
+         "fontSize": 24,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:17",
+        "name": "TrackArtist",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 340,
+         "y": 22
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          432
+         ]
+        ],
+        "characters": "落日车队",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.7019607843137254,
+           "g": 0.7019607843137254,
+           "b": 0.7019607843137254,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 16,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:20",
+        "name": "Progress Track",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 340,
+         "y": 12
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          470
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 6.0,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.1
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:18",
+          "name": "Progress Fill",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 0,
+           "y": 12
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 6.0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": []
+         },
+         {
+          "id": "40:19",
+          "name": "Progress Knob",
+          "type": "ELLIPSE",
+          "size": {
+           "x": 12,
+           "y": 12
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "40:21",
+        "name": "TimeCur",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 60,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          490
+         ]
+        ],
+        "characters": "0:00",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.7019607843137254,
+           "g": 0.7019607843137254,
+           "b": 0.7019607843137254,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:22",
+        "name": "TimeTotal",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 60,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          320
+         ],
+         [
+          0,
+          1,
+          490
+         ]
+        ],
+        "characters": "3:47",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.7019607843137254,
+           "g": 0.7019607843137254,
+           "b": 0.7019607843137254,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "RIGHT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:24",
+        "name": "PrevBtn",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 48,
+         "y": 48
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          86
+         ],
+         [
+          0,
+          1,
+          522
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 24,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.12156862745098039,
+           "g": 0.12156862745098039,
+           "b": 0.12156862745098039,
+           "a": 1.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:23",
+          "name": "PrevGlyph",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 48,
+           "y": 48
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "‹‹",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 700,
+           "fontSize": 20,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": "40:26",
+        "name": "PlayBtn",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 96,
+         "y": 48
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          162
+         ],
+         [
+          0,
+          1,
+          522
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 24,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.11764705882352941,
+           "g": 0.8431372549019608,
+           "b": 0.3764705882352941,
+           "a": 1.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:25",
+          "name": "PlayLabel",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 96,
+           "y": 48
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "播放",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.0,
+             "g": 0.0,
+             "b": 0.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 700,
+           "fontSize": 16,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": "40:28",
+        "name": "NextBtn",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 48,
+         "y": 48
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          286
+         ],
+         [
+          0,
+          1,
+          522
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 24,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.12156862745098039,
+           "g": 0.12156862745098039,
+           "b": 0.12156862745098039,
+           "a": 1.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:27",
+          "name": "NextGlyph",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 48,
+           "y": 48
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "››",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 700,
+           "fontSize": 20,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": "40:29",
+        "name": "VolLabel",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 100,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          594
+         ]
+        ],
+        "characters": "音量",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.7019607843137254,
+           "g": 0.7019607843137254,
+           "b": 0.7019607843137254,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:32",
+        "name": "Volume Track",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 340,
+         "y": 12
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          616
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 6.0,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.1
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:30",
+          "name": "Volume Fill",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 238,
+           "y": 12
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 6.0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": []
+         },
+         {
+          "id": "40:31",
+          "name": "Volume Knob",
+          "type": "ELLIPSE",
+          "size": {
+           "x": 12,
+           "y": 12
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            226
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "40:39",
+        "name": "ListTitle",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 200,
+         "y": 24
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          652
+         ]
+        ],
+        "characters": "播放列表",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 700,
+         "fontSize": 18,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:40",
+        "name": "TrackList",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 340,
+         "y": 204
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          686
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 0,
+        "fills": [],
+        "children": [
+         {
+          "id": "40:38",
+          "name": "TrackRow",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 340,
+           "y": 48
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 6,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.07058823529411765,
+             "g": 0.07058823529411765,
+             "b": 0.07058823529411765,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:33",
+            "name": "RowOn",
+            "type": "FRAME",
+            "visible": false,
+            "size": {
+             "x": 340,
+             "y": 48
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "clipsContent": false,
+            "cornerRadius": 6,
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.12156862745098039,
+               "g": 0.12156862745098039,
+               "b": 0.12156862745098039,
+               "a": 1.0
+              }
+             }
+            ],
+            "children": []
+           },
+           {
+            "id": "40:34",
+            "name": "RowTitle",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 240,
+             "y": 20
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              12
+             ],
+             [
+              0,
+              1,
+              7
+             ]
+            ],
+            "characters": "午夜快线",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 600,
+             "fontSize": 16,
+             "textAlignHorizontal": "LEFT",
+             "textAlignVertical": "TOP",
+             "letterSpacing": 0
+            }
+           },
+           {
+            "id": "40:35",
+            "name": "RowTitleOn",
+            "type": "TEXT",
+            "visible": false,
+            "size": {
+             "x": 240,
+             "y": 20
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              12
+             ],
+             [
+              0,
+              1,
+              7
+             ]
+            ],
+            "characters": "午夜快线",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.11764705882352941,
+               "g": 0.8431372549019608,
+               "b": 0.3764705882352941,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 600,
+             "fontSize": 16,
+             "textAlignHorizontal": "LEFT",
+             "textAlignVertical": "TOP",
+             "letterSpacing": 0
+            }
+           },
+           {
+            "id": "40:36",
+            "name": "RowArtist",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 240,
+             "y": 14
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              12
+             ],
+             [
+              0,
+              1,
+              28
+             ]
+            ],
+            "characters": "落日车队",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.7019607843137254,
+               "g": 0.7019607843137254,
+               "b": 0.7019607843137254,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 12,
+             "textAlignHorizontal": "LEFT",
+             "textAlignVertical": "TOP",
+             "letterSpacing": 0
+            }
+           },
+           {
+            "id": "40:37",
+            "name": "RowTime",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 56,
+             "y": 48
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              272
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "3:47",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.7019607843137254,
+               "g": 0.7019607843137254,
+               "b": 0.7019607843137254,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 12,
+             "textAlignHorizontal": "RIGHT",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           }
+          ]
+         }
+        ],
+        "layoutMode": "VERTICAL",
+        "itemSpacing": 4,
+        "primaryAxisSizingMode": "AUTO",
+        "counterAxisSizingMode": "FIXED"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

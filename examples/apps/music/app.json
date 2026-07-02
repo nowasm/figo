@@ -1,0 +1,16 @@
+{
+  "name": "Music",
+  "design": "design.json",
+  "script": "app.js",
+  "viewport": [
+    420,
+    900
+  ],
+  "entryFrame": "Music",
+  "designSystem": "spotify",
+  "package": {
+    "id": "com.figo.music",
+    "version": "1.0.0"
+  },
+  "benchmark": true
+}
