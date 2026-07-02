@@ -827,6 +827,81 @@ struct Converter {
         return out;
     }
 
+    // Rounded-clip mask for containers whose children MOVE (position anim):
+    // Godot's clip_contents is a screen-axis scissor, so a border-radius mask
+    // (the slash sweep's circle) would chop moving content with straight edges.
+    // Bake the container's rounded-rect shape as a white ALPHA sprite instead;
+    // the emitter pairs it with clip_children = CLIP_CHILDREN_ONLY. Returns the
+    // sprite hash, or 0 when the container doesn't qualify (no radius, no
+    // moving child, or it paints something itself — its own fill would be
+    // hijacked as the mask).
+    std::map<const Node*, uint64_t> maskCache;
+    uint64_t maskClipHash(const Node& n) {
+        auto it = maskCache.find(&n);
+        if (it != maskCache.end()) return it->second;
+        uint64_t& memo = maskCache[&n];
+        memo = 0;
+        float tl = n.cornerRadius, tr = n.cornerRadius, br = n.cornerRadius, bl = n.cornerRadius;
+        if (n.rectangleCornerRadii) {
+            tl = (*n.rectangleCornerRadii)[0]; tr = (*n.rectangleCornerRadii)[1];
+            br = (*n.rectangleCornerRadii)[2]; bl = (*n.rectangleCornerRadii)[3];
+        }
+        const float maxR = std::max(std::max(tl, tr), std::max(br, bl));
+        if (!n.clipsContent || maxR < 0.5f || n.width < 1 || n.height < 1) return 0;
+        // The container must paint NOTHING itself (its texture slot becomes the
+        // mask). cornerRadius alone is fine — it IS the mask shape — so don't
+        // reuse needsBake, which treats any radius as bake-worthy.
+        if (nonSolidVisibleFill(n) || solidFill(n) || !n.fillGeometry.empty() ||
+            hasVisibleStroke(n) || hasVisibleEffect(n)) return 0;
+        std::function<bool(const Node&)> moves = [&](const Node& c) {
+            if (c.anim) for (const auto& k : c.anim->keys) if (k.hasPos) return true;
+            for (const auto& ch : c.children) if (moves(*ch)) return true;
+            return false;
+        };
+        bool anyMove = false;
+        for (const auto& ch : n.children) if (moves(*ch)) { anyMove = true; break; }
+        if (!anyMove) return 0;
+
+        // Rasterize the rounded rect at 2x via its signed distance (1px AA).
+        const int S = 2, W = (int)std::lround(n.width * S), H = (int)std::lround(n.height * S);
+        const float hw = W * 0.5f, hh = H * 0.5f, rmax = std::min(hw, hh);
+        std::vector<uint32_t> px((size_t)W * H);
+        for (int y = 0; y < H; ++y) {
+            for (int x = 0; x < W; ++x) {
+                const float cx = x + 0.5f - hw, cy = y + 0.5f - hh;
+                float r = (cy < 0 ? (cx < 0 ? tl : tr) : (cx < 0 ? bl : br)) * S;
+                r = std::min(r, rmax);
+                const float qx = std::fabs(cx) - (hw - r), qy = std::fabs(cy) - (hh - r);
+                const float d = std::min(std::max(qx, qy), 0.0f) +
+                                std::hypot(std::max(qx, 0.0f), std::max(qy, 0.0f)) - r;
+                const float a = std::min(1.0f, std::max(0.0f, 0.5f - d));
+                px[(size_t)y * W + x] = ((uint32_t)std::lround(a * 255.0f) << 24) | 0x00ffffffu;
+            }
+        }
+        uint64_t h = 1469598103934665603ull;
+        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(px.data());
+        for (size_t i = 0; i < px.size() * 4; ++i) { h ^= bytes[i]; h *= 1099511628211ull; }
+        auto sp = all.find(h);
+        if (sp == all.end()) {
+            std::string stem;
+            for (char c : sanitizeName(n.name, "mask"))
+                stem.push_back((std::isalnum((unsigned char)c) || c == '-' || c == '_') ? c : '_');
+            if (stem.size() > 34) stem.resize(34);
+            char suffix[24];
+            std::snprintf(suffix, sizeof(suffix), "_mask_%08x.png", (unsigned)(h & 0xffffffffu));
+            std::string fname = stem + suffix;
+            if (!writePng(spritesDir / fname, px.data(), W, H)) return 0;
+            GSprite g;
+            g.file = std::string("sprites/") + fname;
+            g.w = W;
+            g.h = H;
+            sp = all.emplace(h, g).first;
+        }
+        sp->second.uses++;
+        memo = h;
+        return h;
+    }
+
     std::string useExt(const std::string& resPath, const char* type, const char* idPrefix) {
         auto it = frameExtId.find(resPath);
         if (it != frameExtId.end()) return it->second;
@@ -1312,6 +1387,23 @@ struct Converter {
                 emit(*child, contentAttr, uniq, scrollH ? scrollCW : n.width, scrollV ? scrollCH : n.height);
             }
             return;
+        } else if (isContainer && maskClipHash(n) != 0) {
+            // ROUNDED CLIP OVER MOVING CONTENT: Godot's clip_contents is a
+            // screen-axis scissor — a circular (border-radius) browser mask
+            // becomes a straight-edged rect that chops a sweeping slash at
+            // slanted angles. Emit the container as a TextureRect holding a
+            // baked rounded-rect ALPHA mask with clip_children = CLIP_CHILDREN
+            // _ONLY: the mask itself is not drawn, children render only where
+            // its alpha is — a true circle clip, matching the browser.
+            const uint64_t mh = maskClipHash(n);
+            header(name, "TextureRect", parentAttr);
+            placeNode(lx, ly, n.width, n.height);
+            commonProps(n, isRoot);
+            body += "texture = ExtResource(\"" + useTexture(mh) + "\")\n";
+            body += "expand_mode = 1\nstretch_mode = 0\n";
+            body += "clip_children = 1\n";  // CLIP_CHILDREN_ONLY
+            nodeJson["type"] = "TextureRect";
+            nodeJson["maskClip"] = all[mh].file;
         } else if (isContainer) {
             header(name, "Control", parentAttr);
             placeNode(lx, ly, n.width, n.height);

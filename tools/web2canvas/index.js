@@ -788,6 +788,27 @@ function setGroupOnlyFn({ gid, on }) {
   }
 }
 
+// An ANIMATED raster is baked unclipped: its resting pose may sit wholly or
+// partly outside an ancestor's overflow/clip-path (the slash sweep parks
+// outside its circular mask), which would bake a transparent/pre-clipped
+// sprite. The engine re-applies the mask dynamically (clip_contents on the
+// ancestor), so release ancestor clipping for the isolated shot and restore.
+function setClipReleaseFn({ id, on }) {
+  const el = document.querySelector(`[data-w2c="${id}"]`);
+  if (!el) return;
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    if (on) {
+      if (p.__w2cClip === undefined) p.__w2cClip = [p.style.overflow, p.style.clipPath];
+      p.style.setProperty('overflow', 'visible', 'important');
+      p.style.setProperty('clip-path', 'none', 'important');
+    } else if (p.__w2cClip !== undefined) {
+      p.style.overflow = p.__w2cClip[0];
+      p.style.clipPath = p.__w2cClip[1];
+      delete p.__w2cClip;
+    }
+  }
+}
+
 // ---- Node-side mapping ----------------------------------------------------
 
 function parseColor(s) {
@@ -964,7 +985,7 @@ function mapNode(n, parent) {
 }
 
 function rasterMarks(n, acc) {
-  if (n.raster && n.rasterHideContent) acc.push({ id: n.raster, clip: n.glowClip });
+  if (n.raster && n.rasterHideContent) acc.push({ id: n.raster, clip: n.glowClip, anim: !!n.anim });
   for (const k of (n.kids || [])) rasterMarks(k, acc);
   return acc;
 }
@@ -1428,9 +1449,31 @@ function openInFigoedit(file) {
     // (the voiceprint bars' height) uses neither, so it's left running.
     await page.evaluate(() => {
       for (const el of document.querySelectorAll('*')) {
-        const an = getComputedStyle(el).animationName;
+        const cs = getComputedStyle(el);
+        const an = cs.animationName;
         if (an && an !== 'none') {
-          el.style.setProperty('transform', 'none', 'important');
+          // A finished FINITE (both-fill) animation rests at its last keyframe,
+          // so the live transform IS the intended base pose. Keep it when it is
+          // rigid (rotation/translation only) — a rotated slash then bakes
+          // tilted and the position track slides the tilted sprite. Neutralize
+          // when it carries scale (the emitted scale track would apply it a
+          // second time) or the animation is infinite (mid-flight pose).
+          const iterRaw = (cs.animationIterationCount || '1').split(',')[0].trim();
+          let keep = false;
+          if (iterRaw !== 'infinite') {
+            const t = cs.transform;
+            if (!t || t === 'none') keep = true;
+            else {
+              const m = /matrix\(([^)]*)\)/.exec(t);
+              if (m) {
+                const a = m[1].split(',').map(parseFloat);
+                const sx = Math.hypot(a[0], a[1]);
+                const sy = sx > 0 ? (a[0] * a[3] - a[1] * a[2]) / sx : 0;
+                keep = Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01;
+              }
+            }
+          }
+          if (!keep) el.style.setProperty('transform', 'none', 'important');
           el.style.setProperty('opacity', '1', 'important');
         }
       }
@@ -1446,13 +1489,14 @@ function openInFigoedit(file) {
     const marks = rasterMarks(tree, []);
     (function whole(n) {
       if (n.rasterGroup) marks.push({ id: n.raster, group: true, clip: n.groupClip });
-      else if (n.raster && !n.rasterHideContent) marks.push({ id: n.raster, whole: true, clip: n.glowClip });
+      else if (n.raster && !n.rasterHideContent) marks.push({ id: n.raster, whole: true, clip: n.glowClip, anim: !!n.anim });
       for (const k of (n.kids || [])) whole(k);
     })(tree);
     if (marks.length) fs.mkdirSync(imagesDir, { recursive: true });
     for (const m of marks) {
       const outPath = path.join(imagesDir, `w2c_${statePrefix}${m.id}.png`);
       try {
+        if (m.anim) await page.evaluate(setClipReleaseFn, { id: m.id, on: true });
         if (m.group) {  // one clip screenshot of the whole decoration cluster
           await page.evaluate(setGroupOnlyFn, { gid: m.id, on: true });
           await page.screenshot({ path: outPath, clip: m.clip, omitBackground: true });
@@ -1468,6 +1512,7 @@ function openInFigoedit(file) {
       finally {
         if (m.group) await page.evaluate(setGroupOnlyFn, { gid: m.id, on: false });
         else await page.evaluate(setBgOnlyFn, { id: m.id, on: false, hideKids: !m.whole });
+        if (m.anim) await page.evaluate(setClipReleaseFn, { id: m.id, on: false });
       }
     }
     totMarks += marks.length;
