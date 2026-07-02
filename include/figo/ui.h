@@ -199,6 +199,57 @@ public:
     void textInput(const std::string& utf8);  // insert at the caret
     void editKey(EditKey key);
 
+    // ---- Value binding (G3): slider / progress semantics on designed nodes ----
+    // The engine owns the "gesture -> value" mapping; the LOOK stays entirely
+    // in the design (track/knob/fill are ordinary designed nodes).
+    struct SliderOptions {
+        float min = 0, max = 1;
+        float step = 0;      // snap increment; 0 = continuous
+        float value = 0;     // initial value (clamped/snapped)
+        std::string knob;    // child name of the track: translated along the axis
+        std::string fill;    // child name of the track: main-axis size follows value
+        bool axisY = false;  // false = horizontal ("x", default); true = vertical
+        // readonly = progress bar: gestures pass through untouched; the value
+        // only moves via setValue().
+        bool readonly = false;
+        // Fires while dragging (committed=false, deduped per value change) and
+        // once on release (committed=true, final value). Never fired by setValue.
+        std::function<void(float value, bool committed)> onChange;
+    };
+    // Registers slider semantics on the named track node (registration is
+    // by NAME, like onClick — it survives bindList/setVariant rebuilds; knob
+    // and fill are re-resolved by name inside the track on every update).
+    // A pointer press on the track (or any descendant) arms the slider; once
+    // the drag direction is known, a drag along the slider's axis is consumed
+    // by the slider (it wins over scrolling on that axis), a cross-axis drag
+    // is handed to normal drag scrolling. A tap jumps to the tapped position
+    // (committed immediately). The engine moves the knob / resizes the fill in
+    // frame-local space (both relativeTransform AND baseTransform, so Scale
+    // and Reflow resize modes agree). Value mapping is linear along +axis
+    // (left/top = min). Returns false when no node with that name exists yet
+    // (the binding is still registered).
+    bool bindSlider(const std::string& trackName, SliderOptions opts);
+    // Program-driven value (progress bars, initial sync): clamps + snaps,
+    // places knob/fill, does NOT fire onChange. False when the name has no
+    // slider binding.
+    bool setValue(const std::string& trackName, float value);
+
+    // ---- Automatic interaction states (G3) ----
+    // Values are "Prop=Value" variant fragments; empty fields fall back to
+    // the State=Hover / State=Pressed / State=Default convention.
+    struct AutoStateMap {
+        std::string hover, pressed, base;
+    };
+    // Registers automatic variant switching for the named INSTANCE (by name,
+    // like onClick): the engine calls setVariant on hover enter/leave and
+    // press/release (pressed wins over hover), each with the default 0.12s
+    // dissolve. The switches are deferred to the end of the pointer event /
+    // update tick, AFTER handler dispatch — so the structural rebuild they
+    // cause never eats the bubbling of the very click that triggered them.
+    // A variant the set doesn't contain is skipped (setVariant fails soft).
+    // Returns whether an instance with that name currently exists.
+    bool autoStates(const std::string& instanceName, const AutoStateMap& states = {});
+
     // ---- Data-driven lists ----
     // Treats the named node's first child as the item template and fills the
     // list with `count` clones of it; `bind` then stamps each clone with its
@@ -230,11 +281,17 @@ public:
     // matches the instance's current properties with State replaced. The
     // component set must be present in the document. Fails (false) when the
     // instance, its set, or the target variant can't be resolved.
+    // durationSec > 0 adds a dissolve-style transition. v1 implementation:
+    // the freshly swapped-in subtree fades in via runtimeOpacity 0 -> authored
+    // over the duration (the old subtree is not snapshotted — the full-frame
+    // transition compositing channel is per-navigation, not per-node).
+    // autoStates uses 0.12s by default.
     bool setVariant(const std::string& instanceName, const std::string& property,
-                    const std::string& value);
+                    const std::string& value, float durationSec = 0.0f);
 
 private:
     FigmaUI();
+    void pointerUpMain(float x, float y);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

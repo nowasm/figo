@@ -71,6 +71,12 @@ Set-Content build\bw.cmd $bat -Encoding ascii; cmd /c "<repo>\build\bw.cmd"; Rem
    - `ui.bindList(name, count, (item, i) => …)`，节点：`.find/.child/.parent/.index/.text/.type`、
      `.scrollX/.scrollY`（可读写）、`.maxScrollX/.maxScrollY`
    - `ui.setText/setVisible/setOpacity/setVariant/setScroll/setEditable/focusText`
+     （`setVariant(..., {duration})` = dissolve 淡入过渡）
+   - `ui.bindSlider(track, {min,max,step?,value,knob?,fill?,axis?,readonly?,onChange(v,committed)})`
+     —— slider/进度条语义：外观全是设计节点，引擎管手势→值（同轴优先于滚动）+
+     摆 knob/缩 fill；`ui.setValue(track, v)` 程序驱动（不触发 onChange）
+   - `ui.autoStates(name, {hover,pressed,base}?)` —— 组件实例 hover/press 自动切变体
+     （默认 State=Hover/Pressed/Default，0.12s dissolve，不吃点击）
    - `ui.playSound(path, volume?) -> bool`（wav/ogg/mp3，路径相对 app 目录；宿主未注入
      音频（如 web）时安静返回 false 不报错）
    - `ui.find/findAll/tap/longPress(nameOrNode)`、`ui.pointerDown/Move/Up(x, y)`

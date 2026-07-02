@@ -36,7 +36,8 @@ ui.onClick("Row Sounds", () => toggle("sound"));
 ui.onClick("Row About", () => ui.navigateTo("About", "slideLeft", 0.28));
 ui.onClick("BackBtn", () => ui.navigateBack(0.28));
 
-// press feedback
+// press feedback — kept as setOpacity: these rows are plain frames, not
+// component-set instances, so ui.autoStates (G3, variant-based) doesn't apply.
 for (const n of ["Row Notifications", "Row Dark Mode", "Row Sounds",
                  "Row About", "BackBtn"]) {
     ui.onHover(n, (node, entered) => ui.setOpacity(node, entered ? 0.82 : -1.0));

@@ -1,4 +1,4 @@
-# G3 设计稿：控件语义 = 变体 + 值绑定（评审用，未实现）
+# G3 设计稿：控件语义 = 变体 + 值绑定（已评审，按此实现）
 
 > 缺口背景见 [benchmark-gaps.md](benchmark-gaps.md) G3。原则已定：**不做内建
 > 控件库**——外观永远归设计（.fig 节点/变体），引擎只补"手势 → 值"的那段
@@ -73,11 +73,15 @@ ui.setVariant("Toggle", "State", "On", { duration: 0.15 });  // 溶解过渡
 每步照例：render/layout test + bench 全绿 + 新断言固化进 `_events_regress`
 或新 `_value_regress`。
 
-## 开放问题（请拍板）
+## 已拍板（2026-07-02）
 
-- A. `bindSlider` 的命名：`bindSlider` vs 更泛的 `bindValue`？（倾向
-  bindSlider——直白；将来真有第二种连续控件再泛化）
-- B. `autoStates` 是否默认对**所有**带 State 变体的实例自动生效（零调用）？
-  （倾向显式调用——魔法行为会让 AI 难以解释截图差异）
-- C. slider 手势与滚动的冲突消解：track 在可滚列表里时，横向 slider +
-  纵向滚动共存（按轴分流），同轴时 slider 优先。是否可接受？
+- A. 命名用 **`bindSlider`**（直白；将来真有第二种连续控件再泛化）。
+- B. `autoStates` **显式调用**（魔法行为会让 AI 难以解释截图差异）。
+- C. slider 与滚动**按轴分流，同轴 slider 优先**。
+
+**已实现（2026-07）**：三件套全部落地，见 `src/ui.cpp`（bindSlider/setValue/
+autoStates/setVariant duration）、`include/figo/script.h` JS 速查、回归
+benchmark `examples/apps/_value_regress/`。dissolve 走的是 runtimeOpacity
+淡入回退路线（转场快照通道是整帧+按导航计数的后端合成，无法按节点复用）；
+autoStates 的变体切换延迟到 pointer 事件/update 派发结束后统一应用，并在
+应用后按最后指针位置重解析 hovered/pressed，保证不吃当次点击。

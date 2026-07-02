@@ -1039,7 +1039,100 @@ JSValue ui_setVariant(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv
         !argName(ctx, argv[2], value)) {
         return JS_EXCEPTION;
     }
-    return JS_NewBool(ctx, im->ui.setVariant(name, prop, value));
+    double dur = 0;  // optional 4th arg: {duration} in seconds (dissolve)
+    if (argc >= 4 && JS_IsObject(argv[3])) {
+        JSValue v = JS_GetPropertyStr(ctx, argv[3], "duration");
+        if (JS_IsNumber(v)) JS_ToFloat64(ctx, &dur, v);
+        JS_FreeValue(ctx, v);
+    }
+    return JS_NewBool(ctx, im->ui.setVariant(name, prop, value,
+                                             static_cast<float>(dur < 0 ? 0 : dur)));
+}
+
+// ui.bindSlider(trackName, {min, max, step?, value, knob?, fill?, axis?,
+// readonly?, onChange(v, committed)?}) — see FigmaUI::bindSlider.
+JSValue ui_bindSlider(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    auto* im = ScriptHost::Impl::from(ctx);
+    std::string name;
+    if (argc < 2 || !argName(ctx, argv[0], name)) return JS_EXCEPTION;
+    if (!JS_IsObject(argv[1])) return JS_ThrowTypeError(ctx, "options object expected");
+    FigmaUI::SliderOptions o;
+    auto num = [&](const char* key, float& out) {
+        JSValue v = JS_GetPropertyStr(ctx, argv[1], key);
+        double d;
+        if (JS_IsNumber(v) && !JS_ToFloat64(ctx, &d, v)) out = static_cast<float>(d);
+        JS_FreeValue(ctx, v);
+    };
+    num("min", o.min);
+    num("max", o.max);
+    num("step", o.step);
+    num("value", o.value);
+    auto str = [&](const char* key, std::string& out) {
+        JSValue v = JS_GetPropertyStr(ctx, argv[1], key);
+        if (JS_IsString(v)) {
+            CStr s(ctx, v);
+            if (s) out = s.s;
+        }
+        JS_FreeValue(ctx, v);
+    };
+    str("knob", o.knob);
+    str("fill", o.fill);
+    std::string axis;
+    str("axis", axis);
+    o.axisY = axis == "y";
+    {
+        JSValue v = JS_GetPropertyStr(ctx, argv[1], "readonly");
+        o.readonly = JS_ToBool(ctx, v) == 1;
+        JS_FreeValue(ctx, v);
+    }
+    JSValue onChange = JS_GetPropertyStr(ctx, argv[1], "onChange");
+    if (JS_IsFunction(ctx, onChange)) {
+        im->retained.push_back(onChange);  // freed with the context
+        JSValue fn = onChange;
+        o.onChange = [im, fn](float value, bool committed) {
+            JSValue args[2] = {JS_NewFloat64(im->ctx, value),
+                               JS_NewBool(im->ctx, committed)};
+            im->callVoid(fn, 2, args);
+        };
+    } else {
+        JS_FreeValue(ctx, onChange);
+    }
+    return JS_NewBool(ctx, im->ui.bindSlider(name, std::move(o)));
+}
+
+// ui.setValue(trackName, v) — program-driven slider/progress value; places
+// knob/fill, never fires onChange.
+JSValue ui_setValue(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    auto* im = ScriptHost::Impl::from(ctx);
+    std::string name;
+    double v = 0;
+    if (argc < 2 || !argName(ctx, argv[0], name) || JS_ToFloat64(ctx, &v, argv[1])) {
+        return JS_EXCEPTION;
+    }
+    return JS_NewBool(ctx, im->ui.setValue(name, static_cast<float>(v)));
+}
+
+// ui.autoStates(name, {hover?, pressed?, base?}?) — values are "Prop=Value";
+// defaults follow the State=Hover/Pressed/Default convention.
+JSValue ui_autoStates(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    auto* im = ScriptHost::Impl::from(ctx);
+    std::string name;
+    if (argc < 1 || !argName(ctx, argv[0], name)) return JS_EXCEPTION;
+    FigmaUI::AutoStateMap map;
+    if (argc >= 2 && JS_IsObject(argv[1])) {
+        auto str = [&](const char* key, std::string& out) {
+            JSValue v = JS_GetPropertyStr(ctx, argv[1], key);
+            if (JS_IsString(v)) {
+                CStr s(ctx, v);
+                if (s) out = s.s;
+            }
+            JS_FreeValue(ctx, v);
+        };
+        str("hover", map.hover);
+        str("pressed", map.pressed);
+        str("base", map.base);
+    }
+    return JS_NewBool(ctx, im->ui.autoStates(name, map));
 }
 
 JSValue ui_setScroll(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
@@ -1407,7 +1500,10 @@ ScriptHost::ScriptHost(FigmaUI& ui) : impl_(std::make_unique<Impl>(ui)) {
     fn("setText", ui_setText, 2);
     fn("setVisible", ui_setVisible, 2);
     fn("setOpacity", ui_setOpacity, 2);
-    fn("setVariant", ui_setVariant, 3);
+    fn("setVariant", ui_setVariant, 4);
+    fn("bindSlider", ui_bindSlider, 2);
+    fn("setValue", ui_setValue, 2);
+    fn("autoStates", ui_autoStates, 2);
     fn("setScroll", ui_setScroll, 3);
     fn("setEditable", ui_setEditable, 2);
     fn("focusText", ui_focusText, 1);

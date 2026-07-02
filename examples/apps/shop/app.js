@@ -64,7 +64,9 @@ ui.onClick("Qty Minus", () => { if (qty > 1) { qty--; renderQty(); } });
 ui.onClick("Qty Plus", () => { if (qty < 9) { qty++; renderQty(); } });
 ui.onClick("Add To Cart", () => { cartCount += qty; renderBadge(); });
 
-// press feedback (opacity only; -1 restores the authored value)
+// press feedback (opacity only; -1 restores the authored value). Kept as
+// setOpacity: these are plain frames, not component-set instances, so
+// ui.autoStates (G3, variant-based) doesn't apply.
 for (const n of ["Product Row", "Add To Cart", "Qty Minus", "Qty Plus",
                  "Back Button"]) {
     ui.onHover(n, (node, entered) => ui.setOpacity(node, entered ? 0.82 : -1.0));

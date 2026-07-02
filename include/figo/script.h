@@ -29,7 +29,28 @@
 //   ui.currentFrame() -> node          ui.setResizeMode("reflow" | "scale")
 //   ui.bindList(name, count, fn(itemNode, index))
 //   ui.setText(name, s)  ui.setVisible(name, b)  ui.setOpacity(name, v)
-//   ui.setVariant(name, property, value)         ui.setScroll(name, x, y)
+//   ui.setVariant(name, property, value, {duration}?)  ui.setScroll(name, x, y)
+//     // duration (seconds) adds a dissolve: the swapped-in variant subtree
+//     // fades in from transparent, then returns to its authored opacity
+//   ui.bindSlider(name, {min, max, step?, value, knob?, fill?, axis?,
+//                        readonly?, onChange(v, committed)?})
+//     // slider/progress semantics on a designed track node (registered by
+//     // NAME — survives bindList/setVariant rebuilds). The engine takes the
+//     // pointer gesture on the track: a drag along the axis ("x" default,
+//     // "y" vertical; left/top = min) maps linearly to [min,max] with step
+//     // snapping, moves the knob / resizes the fill (both are child names of
+//     // the track), and fires onChange(v,false) while dragging and (v,true)
+//     // once on release. A tap jumps + commits. Same-axis drags beat
+//     // scrolling; cross-axis drags fall through to the scroll container.
+//     // readonly:true = progress bar (gestures pass through untouched).
+//   ui.setValue(name, v)  // program-driven slider/progress value: clamps,
+//     // snaps, places knob/fill; never fires onChange
+//   ui.autoStates(name, {hover?, pressed?, base?}?)  // automatic variant
+//     // switching for the named INSTANCE on hover/press/release (pressed
+//     // wins over hover), values are "Prop=Value"; defaults State=Hover /
+//     // State=Pressed / State=Default. Switches use a 0.12s dissolve and
+//     // apply AFTER event dispatch, so they never eat the click. Variants
+//     // missing from the set are skipped (soft no-op).
 //   ui.setEditable(name, editable?)    ui.focusText(name)    ui.blur()
 //   ui.find(name) -> node|null         ui.findAll(name) -> [node]
 //   ui.diagnostics() -> [{kind, node, id, message}]  // render problems in the

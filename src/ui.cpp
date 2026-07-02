@@ -459,6 +459,200 @@ struct FigmaUI::Impl {
     // Pristine item templates detached by bindList, keyed by the list node.
     std::unordered_map<Node*, std::unique_ptr<Node>> listTemplates;
 
+    // ---- Value binding (bindSlider) ----
+    // Bindings are keyed by node NAME (like the handler maps): they survive
+    // bindList/setVariant rebuilds; the track and its knob/fill children are
+    // re-resolved by name on every touch, never held across frames.
+    FigmaUI* self = nullptr;  // for Impl helpers that call public methods
+    std::unordered_map<std::string, FigmaUI::SliderOptions> sliders;
+    std::string sliderName;     // track armed by the current press ("" = none)
+    bool sliderDecided = false; // axis decision made for this press
+    bool sliderActive = false;  // ...and the slider won (drag drives the value)
+
+    static float snapSliderValue(const FigmaUI::SliderOptions& o, float v) {
+        if (o.step > 0 && o.max != o.min) {
+            v = o.min + std::round((v - o.min) / o.step) * o.step;
+        }
+        return std::clamp(v, std::min(o.min, o.max), std::max(o.min, o.max));
+    }
+
+    // Nearest interactive slider track in the ancestor chain (readonly
+    // progress bars never take the gesture).
+    std::string sliderAtChain(Node* hit) {
+        if (sliders.empty()) return {};
+        for (Node* n = hit; n; n = n->parent) {
+            const auto it = sliders.find(n->name);
+            if (it != sliders.end() && !it->second.readonly) return n->name;
+            if (n == frame) break;
+        }
+        return {};
+    }
+
+    // Engine-side visuals: knob translated / fill resized along the axis, in
+    // frame-local space. baseTransform/baseWidth are updated in the authored
+    // space too, so a Reflow relayout or a Scale-mode resetLayout reproduces
+    // the same value position instead of wiping it.
+    void applySliderVisuals(Node* track, const FigmaUI::SliderOptions& o) {
+        const float range = o.max - o.min;
+        const float t = range != 0 ? (o.value - o.min) / range : 0.0f;
+        bool dirty = false;
+        if (!o.knob.empty()) {
+            if (Node* k = track->findByName(o.knob)) {
+                if (o.axisY) {
+                    k->relativeTransform.m12 =
+                        t * std::max(0.0f, track->height - k->height);
+                    k->baseTransform.m12 =
+                        t * std::max(0.0f, track->baseHeight - k->baseHeight);
+                } else {
+                    k->relativeTransform.m02 =
+                        t * std::max(0.0f, track->width - k->width);
+                    k->baseTransform.m02 =
+                        t * std::max(0.0f, track->baseWidth - k->baseWidth);
+                }
+                dirty = true;
+            }
+        }
+        if (!o.fill.empty()) {
+            if (Node* f = track->findByName(o.fill)) {
+                if (o.axisY) {
+                    f->height = t * track->height;
+                    f->baseHeight = t * track->baseHeight;
+                } else {
+                    f->width = t * track->width;
+                    f->baseWidth = t * track->baseWidth;
+                }
+                dirty = true;
+            }
+        }
+        if (dirty) renderer.markDirty();
+    }
+
+    // Viewport point -> snapped slider value via the track's cached absolute
+    // transform (valid under scrolling, like caret placement).
+    bool sliderValueAtViewport(Node* track, const FigmaUI::SliderOptions& o,
+                               float x, float y, float& out) {
+        const auto invC = renderer.contentTransform().inverted();
+        const auto invA = track->absoluteTransform.inverted();
+        if (!invC || !invA) return false;
+        float fx, fy, lx, ly;
+        invC->apply(x, y, fx, fy);
+        invA->apply(fx, fy, lx, ly);
+        const float span = o.axisY ? track->height : track->width;
+        if (span <= 0) return false;
+        const float t = std::clamp((o.axisY ? ly : lx) / span, 0.0f, 1.0f);
+        out = snapSliderValue(o, o.min + t * (o.max - o.min));
+        return true;
+    }
+
+    // Advance the armed slider to the pointer position. Fires onChange on
+    // value change (committed=false) and once on release (committed=true).
+    // The track is re-found by name — onChange may rebuild the tree.
+    void sliderDragUpdate(const std::string& name, float x, float y, bool committed) {
+        const auto it = sliders.find(name);
+        if (it == sliders.end()) return;
+        Node* track = findMutable(name);
+        if (!track) return;
+        float v;
+        if (!sliderValueAtViewport(track, it->second, x, y, v)) return;
+        const bool changed = v != it->second.value;
+        if (changed) {
+            it->second.value = v;
+            applySliderVisuals(track, it->second);
+        }
+        if ((changed || committed) && it->second.onChange) {
+            it->second.onChange(v, committed);
+        }
+    }
+
+    // ---- autoStates: hover/press -> automatic variant switching ----
+    // Registered per instance NAME. The switches queue up during pointer
+    // dispatch and flush AFTER it (end of the pointer function / update
+    // tick): setVariant bumps structureRev, and a bump mid-dispatch would
+    // consume the very click that caused it (G10 semantics).
+    static constexpr float kAutoStateFadeSec = 0.12f;
+    struct AutoStateSpec {
+        std::string hover, pressed, base;  // "Prop=Value"
+    };
+    std::unordered_map<std::string, AutoStateSpec> autoStateSpecs;
+    std::string autoHoverName;  // instance currently in hover state
+    std::string autoPressName;  // instance currently in pressed state
+    struct PendingVariant {
+        std::string name, prop, value;
+    };
+    std::vector<PendingVariant> pendingAutoVariant;
+
+    // Nearest registered instance name in the ancestor chain.
+    std::string autoTargetOf(Node* n) {
+        if (autoStateSpecs.empty()) return {};
+        for (Node* p = n; p; p = p->parent) {
+            if (autoStateSpecs.count(p->name)) return p->name;
+            if (p == frame) break;
+        }
+        return {};
+    }
+
+    // state: 0 = base, 1 = hover, 2 = pressed.
+    void queueAutoVariant(const std::string& name, int state) {
+        const auto it = autoStateSpecs.find(name);
+        if (it == autoStateSpecs.end()) return;
+        const std::string& pv = state == 2   ? it->second.pressed
+                                : state == 1 ? it->second.hover
+                                             : it->second.base;
+        const size_t eq = pv.find('=');
+        if (eq == std::string::npos) return;
+        pendingAutoVariant.push_back({name, pv.substr(0, eq), pv.substr(eq + 1)});
+    }
+
+    void flushAutoVariants();  // defined after setVariant (needs it)
+
+    // Hover bookkeeping shared by pointerMove and the press release.
+    void noteAutoHover(Node* hit) {
+        const std::string name = autoTargetOf(hit);
+        if (name == autoHoverName) return;
+        if (!autoHoverName.empty() && autoHoverName != autoPressName) {
+            queueAutoVariant(autoHoverName, 0);
+        }
+        autoHoverName = name;
+        if (!name.empty()) {
+            queueAutoVariant(name, name == autoPressName ? 2 : 1);
+        }
+    }
+
+    // ---- setVariant dissolve (v1: fade-in of the new subtree) ----
+    // Keyed by instance name (survives further rebuilds); stepped by
+    // update(dt). runtimeOpacity animates 0 -> 1, then resets to authored.
+    struct VariantFade {
+        float elapsed = 0, duration = 0;
+    };
+    std::unordered_map<std::string, VariantFade> variantFades;
+
+    void stepVariantFades(float dt) {
+        if (variantFades.empty()) return;
+        for (auto it = variantFades.begin(); it != variantFades.end();) {
+            it->second.elapsed += dt;
+            Node* n = findMutable(it->first);
+            if (!n) {
+                it = variantFades.erase(it);
+                continue;
+            }
+            const float p = it->second.duration > 0
+                                ? it->second.elapsed / it->second.duration
+                                : 1.0f;
+            n->runtimeOpacity = p >= 1.0f ? -1.0f : p;  // -1 = back to authored
+            if (p >= 1.0f) it = variantFades.erase(it);
+            else ++it;
+        }
+        renderer.markDirty();
+    }
+
+    void finishVariantFades() {
+        for (auto& [name, fade] : variantFades) {
+            if (Node* n = findMutable(name)) n->runtimeOpacity = -1.0f;
+        }
+        if (!variantFades.empty()) renderer.markDirty();
+        variantFades.clear();
+    }
+
     // ---- Navigation ----
     struct NavEntry {
         Node* frame;
@@ -504,6 +698,17 @@ struct FigmaUI::Impl {
         pressed = nullptr;
         dragScrollNode = nullptr;
         dragScrolling = false;
+        // Leaving a page mid-gesture: the old page's auto-state instances go
+        // back to base (queued — we may be inside handler dispatch right now;
+        // the flush happens at the end of the pointer event / update tick).
+        if (!autoHoverName.empty()) queueAutoVariant(autoHoverName, 0);
+        if (!autoPressName.empty() && autoPressName != autoHoverName) {
+            queueAutoVariant(autoPressName, 0);
+        }
+        autoHoverName.clear();
+        autoPressName.clear();
+        sliderName.clear();
+        sliderDecided = sliderActive = false;
         stopScrollAnims();
         reflow();
     }
@@ -647,7 +852,7 @@ struct FigmaUI::Impl {
     }
 };
 
-FigmaUI::FigmaUI() : impl_(std::make_unique<Impl>()) {}
+FigmaUI::FigmaUI() : impl_(std::make_unique<Impl>()) { impl_->self = this; }
 FigmaUI::~FigmaUI() = default;
 
 std::unique_ptr<FigmaUI> FigmaUI::fromFile(const std::string& path) {
@@ -759,9 +964,13 @@ void FigmaUI::update(float dtSeconds) {
                 p < 0.5f ? 4 * p * p * p : 1 - std::pow(-2 * p + 2, 3.0f) / 2;
         }
     }
+    impl_->stepVariantFades(dtSeconds);  // setVariant dissolve fade-ins
     // All of this frame's scroll changes (wheel easing, fling, drag, script
     // writes) coalesce into one onScroll dispatch per node per frame.
     impl_->dispatchScrollEvents();
+    // Auto-state switches queued during dispatch (e.g. a handler navigated)
+    // apply now, after every handler ran.
+    impl_->flushAutoVariants();
 }
 
 bool FigmaUI::animating() const { return impl_->transFrom != nullptr; }
@@ -863,6 +1072,34 @@ void FigmaUI::pointerMove(float x, float y) {
             Impl::kDragScrollThreshold) {
         impl_->pressMoved = true;
     }
+    // Armed slider: decide the gesture's axis once it travels past the drag
+    // threshold. Along the slider's axis the slider wins (over scrolling);
+    // across it the press is handed back to normal drag scrolling.
+    if (impl_->pressed && !impl_->sliderName.empty()) {
+        if (!impl_->sliderDecided) {
+            const float dx = x - impl_->pressDownX, dy = y - impl_->pressDownY;
+            if (std::hypot(dx, dy) > Impl::kDragScrollThreshold) {
+                impl_->sliderDecided = true;
+                const auto it = impl_->sliders.find(impl_->sliderName);
+                const bool axisY = it != impl_->sliders.end() && it->second.axisY;
+                const float along = axisY ? dy : dx, cross = axisY ? dx : dy;
+                if (std::abs(along) >= std::abs(cross)) {
+                    impl_->sliderActive = true;
+                    impl_->dragScrollNode = nullptr;  // same axis: slider wins
+                    impl_->sliderDragUpdate(impl_->sliderName, x, y, false);
+                } else {
+                    impl_->sliderName.clear();  // cross axis: scrolling's turn
+                }
+            }
+        } else if (impl_->sliderActive) {
+            impl_->sliderDragUpdate(impl_->sliderName, x, y, false);
+        }
+        if (impl_->sliderActive) {  // no hover churn / scrolling while sliding
+            impl_->lastPointerX = x;
+            impl_->lastPointerY = y;
+            return;
+        }
+    }
     if (impl_->pressed && impl_->dragScrollNode) {
         const float dx = x - impl_->lastPointerX, dy = y - impl_->lastPointerY;
         impl_->lastPointerX = x;
@@ -903,9 +1140,19 @@ void FigmaUI::pointerMove(float x, float y) {
     if (impl_->structureRev != rev) hit = impl_->hitTestViewport(x, y);
     impl_->hovered = hit;
     if (hit) {
+        const uint64_t revEnter = impl_->structureRev;
         impl_->fireUp(impl_->hoverHandlers, hit,
                       [&](HoverHandler& h, Node& n) { h(n, true, x, y); });
+        // The enter handler may have rebuilt the tree too.
+        if (impl_->structureRev != revEnter) {
+            hit = impl_->hitTestViewport(x, y);
+            impl_->hovered = hit;
+        }
     }
+    // autoStates: hover enter/leave switches variants — queued during
+    // dispatch, applied after it (so the rebuild can't eat this event).
+    impl_->noteAutoHover(hit);
+    impl_->flushAutoVariants();
 }
 
 void FigmaUI::pointerDown(float x, float y) {
@@ -945,9 +1192,46 @@ void FigmaUI::pointerDown(float x, float y) {
     impl_->suppressClick = false;
     impl_->dragConsumedX = 0;
     impl_->stopScrollAnims();  // the finger catches any easing/fling in flight
+
+    // Arm slider capture: a press on a bound track (or its subtree) may
+    // become a value drag once the axis decision falls its way.
+    impl_->sliderName =
+        impl_->selectingText ? std::string() : impl_->sliderAtChain(impl_->pressed);
+    impl_->sliderDecided = false;
+    impl_->sliderActive = false;
+
+    // autoStates: press state (wins over hover), applied after this event.
+    impl_->autoPressName = impl_->autoTargetOf(impl_->pressed);
+    if (!impl_->autoPressName.empty()) {
+        impl_->queueAutoVariant(impl_->autoPressName, 2);
+    }
+    impl_->flushAutoVariants();
 }
 
 void FigmaUI::pointerUp(float x, float y) {
+    pointerUpMain(x, y);
+    // autoStates: settle the pressed instance — back to hover when released
+    // over it, base otherwise. Done in this wrapper so every early-return
+    // path of the main handler (drag release, swipe, text) is covered, and
+    // the variant swap happens strictly AFTER click dispatch.
+    auto& d = *impl_;
+    if (!d.autoPressName.empty()) {  // a navigation already cleared + queued
+        const std::string name = d.autoPressName;
+        d.autoPressName.clear();
+        Node* now = d.hitTestViewport(x, y);
+        if (d.autoTargetOf(now) == name) {
+            d.queueAutoVariant(name, 1);
+            d.autoHoverName = name;
+        } else {
+            d.queueAutoVariant(name, 0);
+            if (d.autoHoverName == name) d.autoHoverName.clear();
+            d.noteAutoHover(now);
+        }
+    }
+    d.flushAutoVariants();
+}
+
+void FigmaUI::pointerUpMain(float x, float y) {
     if (impl_->selectingText) {
         impl_->selectingText = false;
         Node* f = impl_->focused;
@@ -978,6 +1262,21 @@ void FigmaUI::pointerUp(float x, float y) {
         return;
     }
     impl_->dragScrollNode = nullptr;
+
+    // Slider release: an axis-won drag commits its final value; a tap on the
+    // track jumps to the tapped position and commits. Either way the release
+    // is the slider's (no click, no focus change).
+    if (!impl_->sliderName.empty()) {
+        const std::string name = impl_->sliderName;
+        const bool take = impl_->sliderActive || !impl_->sliderDecided;
+        impl_->sliderName.clear();
+        impl_->sliderDecided = impl_->sliderActive = false;
+        if (take) {
+            impl_->sliderDragUpdate(name, x, y, true);
+            impl_->pressed = nullptr;
+            return;
+        }
+    }
 
     // A swipe or a fired long press consumes the release: no focus change,
     // no click, no prototype navigation.
@@ -1208,6 +1507,16 @@ void FigmaUI::clearHandlers() {
     impl_->swipeHandlers.clear();
     impl_->scrollHandlers.clear();
     impl_->pendingScroll.clear();
+    // Value bindings and auto-states are script-registered like handlers:
+    // hot reload re-registers them from scratch.
+    impl_->sliders.clear();
+    impl_->sliderName.clear();
+    impl_->sliderDecided = impl_->sliderActive = false;
+    impl_->autoStateSpecs.clear();
+    impl_->pendingAutoVariant.clear();
+    impl_->autoHoverName.clear();
+    impl_->autoPressName.clear();
+    impl_->finishVariantFades();  // don't leave a half-faded subtree behind
 }
 
 bool FigmaUI::bindList(const std::string& listName, size_t count,
@@ -1448,7 +1757,7 @@ std::map<std::string, std::string> parseVariantName(const std::string& name) {
 }  // namespace
 
 bool FigmaUI::setVariant(const std::string& instanceName, const std::string& property,
-                         const std::string& value) {
+                         const std::string& value, float durationSec) {
     Node* inst = impl_->findMutable(instanceName);
     if (!inst || inst->componentId.empty()) return false;
     impl_->stopScrollAnims();  // the instance subtree is about to be replaced
@@ -1507,7 +1816,90 @@ bool FigmaUI::setVariant(const std::string& instanceName, const std::string& pro
     impl_->hovered = nullptr;
     impl_->pressed = nullptr;
     impl_->renderer.markDirty();
+
+    // The clones carry the MASTER's cached absolute transforms (canvas
+    // space); hit-testing must work before the next render re-caches them
+    // (autoStates re-resolves the in-flight press right after this swap).
+    {
+        std::function<void(Node&)> recache = [&](Node& n) {
+            for (auto& c : n.children) {
+                c->absoluteTransform = n.absoluteTransform * c->relativeTransform;
+                recache(*c);
+            }
+        };
+        recache(*inst);
+    }
+
+    // Dissolve (v1): the new subtree fades in from transparent over the
+    // duration; update(dt) steps it and restores the authored opacity.
+    // (The full-frame transition snapshot channel is per-navigation and
+    // backend-composited — no per-node reuse — so no old-subtree snapshot.)
+    if (durationSec > 0) {
+        inst->runtimeOpacity = 0.0f;
+        impl_->variantFades[instanceName] = {0.0f, durationSec};
+    } else {
+        impl_->variantFades.erase(instanceName);  // instant switch cancels a fade
+        inst->runtimeOpacity = -1.0f;
+    }
+
+    // Sliders bound inside the swapped subtree: re-place knob/fill so the
+    // fresh clone shows the current value, not the authored one.
+    for (auto& [name, opts] : impl_->sliders) {
+        if (Node* track = inst->findByName(name)) {
+            impl_->applySliderVisuals(track, opts);
+        }
+    }
     return true;
+}
+
+// Deferred autoStates switches: applied strictly outside handler dispatch.
+// setVariant nulls hovered/pressed (their subtree was freed), which would
+// break the in-flight gesture — so both are re-resolved at the last pointer
+// position afterwards and the press keeps clicking on release.
+void FigmaUI::Impl::flushAutoVariants() {
+    if (pendingAutoVariant.empty()) return;
+    std::vector<PendingVariant> batch;
+    batch.swap(pendingAutoVariant);  // applying may queue again (never loops:
+                                     // queueAutoVariant only runs in pointer code)
+    const bool hadPressed = pressed != nullptr;
+    const bool hadHovered = hovered != nullptr;
+    const uint64_t rev = structureRev;
+    for (const PendingVariant& p : batch) {
+        // Fails soft when the set lacks the variant (e.g. no Pressed state).
+        self->setVariant(p.name, p.prop, p.value, kAutoStateFadeSec);
+    }
+    if (structureRev == rev) return;  // nothing actually swapped
+    if (hadPressed) pressed = hitTestViewport(lastPointerX, lastPointerY);
+    if (hadHovered) hovered = hitTestViewport(lastPointerX, lastPointerY);
+}
+
+bool FigmaUI::bindSlider(const std::string& trackName, SliderOptions opts) {
+    opts.value = Impl::snapSliderValue(opts, opts.value);
+    auto& slot = impl_->sliders[trackName];
+    slot = std::move(opts);
+    Node* track = impl_->findMutable(trackName);
+    if (track) impl_->applySliderVisuals(track, slot);
+    return track != nullptr;
+}
+
+bool FigmaUI::setValue(const std::string& trackName, float value) {
+    const auto it = impl_->sliders.find(trackName);
+    if (it == impl_->sliders.end()) return false;
+    it->second.value = Impl::snapSliderValue(it->second, value);
+    if (Node* track = impl_->findMutable(trackName)) {
+        impl_->applySliderVisuals(track, it->second);
+    }
+    return true;
+}
+
+bool FigmaUI::autoStates(const std::string& instanceName, const AutoStateMap& states) {
+    Impl::AutoStateSpec spec;
+    spec.hover = states.hover.empty() ? "State=Hover" : states.hover;
+    spec.pressed = states.pressed.empty() ? "State=Pressed" : states.pressed;
+    spec.base = states.base.empty() ? "State=Default" : states.base;
+    impl_->autoStateSpecs[instanceName] = std::move(spec);
+    Node* n = impl_->findMutable(instanceName);
+    return n && !n->componentId.empty();
 }
 
 }  // namespace figo
