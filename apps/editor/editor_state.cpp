@@ -1,0 +1,691 @@
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "editor.h"
+
+namespace figoedit {
+
+float gUiScale = 1.0f;
+int kToolbarH = 44;
+int kLayersW = 260;
+int kInspectorW = 280;
+
+void initUiScale() {
+    // Window units are physical pixels (GLFW makes the process DPI-aware on
+    // Windows), so scale the UI by the monitor's physical resolution.
+    gUiScale = std::max(
+        1.0f, static_cast<float>(GetMonitorWidth(GetCurrentMonitor())) / 1920.0f);
+    gUiScale = std::min(gUiScale, 3.0f);
+    if (const char* env = std::getenv("FIGOEDIT_SCALE"); env && *env) {
+        gUiScale = std::max(0.5f, std::min(4.0f, static_cast<float>(std::atof(env))));
+    }
+    kToolbarH = static_cast<int>(44 * gUiScale);
+    kLayersW = static_cast<int>(260 * gUiScale);
+    kInspectorW = static_cast<int>(280 * gUiScale);
+}
+
+// ---- UI font -----------------------------------------------------------------
+
+Font gUiFont{};
+static bool gUiFontLoaded = false;
+
+namespace {
+
+// CJK proper (not emoji/symbols): radicals..unified, kana, fullwidth.
+bool isCjkCodepoint(int cp) {
+    return (cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) ||
+           (cp >= 0xFF00 && cp <= 0xFFEF);
+}
+
+// Decode UTF-8, collecting unique codepoints.
+void collectCodepoints(const std::string& s, std::unordered_set<int>& out) {
+    size_t i = 0;
+    while (i < s.size()) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        int cp = 0;
+        size_t len = 1;
+        if (c < 0x80) { cp = c; }
+        else if ((c >> 5) == 0x6 && i + 1 < s.size()) {
+            cp = ((c & 0x1F) << 6) | (s[i + 1] & 0x3F);
+            len = 2;
+        } else if ((c >> 4) == 0xE && i + 2 < s.size()) {
+            cp = ((c & 0x0F) << 12) | ((s[i + 1] & 0x3F) << 6) | (s[i + 2] & 0x3F);
+            len = 3;
+        } else if ((c >> 3) == 0x1E && i + 3 < s.size()) {
+            cp = ((c & 0x07) << 18) | ((s[i + 1] & 0x3F) << 12) | ((s[i + 2] & 0x3F) << 6) |
+                 (s[i + 3] & 0x3F);
+            len = 4;
+        }
+        if (cp >= 32) out.insert(cp);
+        i += len;
+    }
+}
+
+uint32_t be32(const unsigned char* p) {
+    return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+}
+
+// raylib's font loader (stb_truetype) only reads an sfnt at file offset 0, so
+// it can't open .ttc collections directly. But a ttc is just a 'ttcf' header +
+// face table directories whose table offsets are ABSOLUTE file offsets — so
+// relocating face 0's table directory to offset 0 turns the buffer into a
+// valid standalone ttf in place (the bytes clobbered are only the ttc header,
+// which nothing else references).
+void promoteTtcFaceInPlace(unsigned char* data, int bytes) {
+    if (bytes < 16 || std::memcmp(data, "ttcf", 4) != 0) return;
+    const uint32_t numFonts = be32(data + 8);
+    if (numFonts == 0) return;
+    const uint32_t faceOff = be32(data + 12);  // face 0
+    if (faceOff + 12 > static_cast<uint32_t>(bytes)) return;
+    const uint32_t numTables = (uint32_t(data[faceOff + 4]) << 8) | data[faceOff + 5];
+    const uint32_t dirLen = 12 + 16 * numTables;
+    if (faceOff + dirLen > static_cast<uint32_t>(bytes)) return;
+    std::memmove(data, data + faceOff, dirLen);
+}
+
+// Load glyphs for `cps` from the font file at `path` (nullptr on failure).
+GlyphInfo* loadGlyphs(const char* path, const std::vector<int>& cps) {
+    int bytes = 0;
+    unsigned char* data = LoadFileData(path, &bytes);
+    if (!data) return nullptr;
+    promoteTtcFaceInPlace(data, bytes);
+    GlyphInfo* glyphs = LoadFontData(data, bytes, fontM(), const_cast<int*>(cps.data()),
+                                     static_cast<int>(cps.size()), FONT_DEFAULT);
+    UnloadFileData(data);
+    return glyphs;
+}
+
+void installUiFont(Font f, const char* what) {
+    if (gUiFontLoaded) UnloadFont(gUiFont);
+    gUiFont = f;
+    gUiFontLoaded = true;
+    SetTextureFilter(gUiFont.texture, TEXTURE_FILTER_BILINEAR);
+    std::fprintf(stderr, "[font] loaded %s (%d glyphs)\n", what, f.glyphCount);
+}
+
+void loadUiFont(const std::vector<int>& codepoints) {
+    // The editor chrome always renders in the same base face; documents only
+    // ever ADD fallback glyphs to the atlas, never swap the face — otherwise
+    // the whole UI changes font depending on which design file is open.
+    // Semibold Latin (seguisb) reads better a touch heavier at these sizes;
+    // CJK glyphs are merged in from YaHei bold into the same atlas.
+    // .ttc collections work via promoteTtcFaceInPlace (face 0).
+#ifdef __APPLE__
+    const char* baseCands[] = {
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+    };
+    const char* cjkCands[] = {
+        "/System/Library/Fonts/PingFang.ttc",
+        "/Library/Fonts/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    };
+#else
+    const char* baseCands[] = {
+        "C:/Windows/Fonts/seguisb.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+    };
+    const char* cjkCands[] = {
+        "C:/Windows/Fonts/msyhbd.ttc",
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/simhei.ttf",
+    };
+#endif
+    std::vector<int> base, cjk;
+    for (int cp : codepoints) (isCjkCodepoint(cp) ? cjk : base).push_back(cp);
+
+    // Candidate files can exist but still fail to parse (e.g. .ttc on this
+    // loader), so "chosen" means glyphs actually loaded.
+    GlyphInfo* g1 = nullptr;
+    const char* basePath = nullptr;
+    for (const char* p : baseCands) {
+        if ((g1 = loadGlyphs(p, base))) { basePath = p; break; }
+    }
+    GlyphInfo* g2 = nullptr;
+    const char* cjkPath = nullptr;
+    if (!cjk.empty()) {
+        for (const char* p : cjkCands) {
+            if ((g2 = loadGlyphs(p, cjk))) { cjkPath = p; break; }
+        }
+        if (!g2)
+            std::fprintf(stderr, "[font] no usable CJK face (%zu glyphs dropped)\n",
+                         cjk.size());
+    }
+    if (!g1 && cjkPath) {
+        // No base face at all — pull Latin from the CJK face rather than tofu.
+        g1 = loadGlyphs(cjkPath, base);
+        basePath = cjkPath;
+    }
+    if (!g1) {
+        if (g2) UnloadFontData(g2, static_cast<int>(cjk.size()));
+        std::fprintf(stderr, "[font] no usable UI font\n");
+        if (!gUiFontLoaded) gUiFont = GetFontDefault();  // last resort
+        return;
+    }
+
+    const int total = static_cast<int>(base.size() + (g2 ? cjk.size() : 0));
+    auto* all = static_cast<GlyphInfo*>(MemAlloc(total * sizeof(GlyphInfo)));
+    std::memcpy(all, g1, base.size() * sizeof(GlyphInfo));
+    if (g2) std::memcpy(all + base.size(), g2, cjk.size() * sizeof(GlyphInfo));
+    MemFree(g1);  // container arrays only; glyph images now owned by `all`
+    if (g2) MemFree(g2);
+
+    Rectangle* recs = nullptr;
+    Image atlas = GenImageFontAtlas(all, &recs, total, fontM(), 4, 0);
+    Font f{};
+    f.baseSize = fontM();
+    f.glyphCount = total;
+    f.glyphPadding = 4;
+    f.glyphs = all;
+    f.recs = recs;
+    f.texture = LoadTextureFromImage(atlas);
+    UnloadImage(atlas);
+    if (f.texture.id == 0) {
+        UnloadFont(f);
+        std::fprintf(stderr, "[font] atlas upload failed\n");
+        if (!gUiFontLoaded) gUiFont = GetFontDefault();
+        return;
+    }
+    installUiFont(f, g2 ? TextFormat("%s + %s", basePath, cjkPath) : basePath);
+}
+
+}  // namespace
+
+void initUiFont() {
+    std::vector<int> ascii;
+    for (int cp = 32; cp < 127; ++cp) ascii.push_back(cp);
+    loadUiFont(ascii);
+}
+
+void rebuildUiFontFor(const figo::Document& doc) {
+    std::unordered_set<int> cps;
+    for (int cp = 32; cp < 127; ++cp) cps.insert(cp);
+    if (doc.root) {
+        const_cast<Node*>(doc.root.get())->visit([&](Node& n) {
+            collectCodepoints(n.name, cps);
+            collectCodepoints(n.characters, cps);
+            return cps.size() < 4096;  // atlas safety cap
+        });
+    }
+    std::vector<int> list(cps.begin(), cps.end());
+    loadUiFont(list);
+}
+
+void uiText(const char* text, float x, float y, int size, ::Color color) {
+    DrawTextEx(gUiFont, text, {x, y}, static_cast<float>(size), 0, color);
+}
+
+float uiMeasure(const char* text, int size) {
+    return MeasureTextEx(gUiFont, text, static_cast<float>(size), 0).x;
+}
+
+NodeProps NodeProps::capture(Node* n) {
+    NodeProps p;
+    p.node = n;
+    p.type = n->type;
+    p.transform = n->relativeTransform;
+    p.width = n->width;
+    p.height = n->height;
+    p.opacity = n->opacity;
+    p.cornerRadius = n->cornerRadius;
+    p.visible = n->visible;
+    p.fills = n->fills;
+    p.strokes = n->strokes;
+    p.strokeWeight = n->strokeWeight;
+    p.strokeAlign = n->strokeAlign;
+    p.effects = n->effects;
+    p.textStyle = n->textStyle;
+    p.characters = n->characters;
+    p.name = n->name;
+    p.clipsContent = n->clipsContent;
+    p.rectangleCornerRadii = n->rectangleCornerRadii;
+    p.strokeDashes = n->strokeDashes;
+    p.textRuns = n->textRuns;
+    p.fillGeometry = n->fillGeometry;
+    p.constraintH = n->constraintH;
+    p.constraintV = n->constraintV;
+    p.autoLayout = n->autoLayout;
+    p.layoutGrow = n->layoutGrow;
+    p.layoutAlignStretch = n->layoutAlignStretch;
+    p.layoutAbsolute = n->layoutAbsolute;
+    p.numVarBindings = n->numVarBindings;
+    p.instanceOverrides = n->instanceOverrides;
+    p.blendMode = n->blendMode;
+    p.isMask = n->isMask;
+    return p;
+}
+
+void NodeProps::apply() const {
+    node->type = type;
+    node->relativeTransform = transform;
+    node->width = width;
+    node->height = height;
+    node->opacity = opacity;
+    node->cornerRadius = cornerRadius;
+    node->visible = visible;
+    node->fills = fills;
+    node->strokes = strokes;
+    node->strokeWeight = strokeWeight;
+    node->strokeAlign = strokeAlign;
+    node->effects = effects;
+    node->textStyle = textStyle;
+    node->characters = characters;
+    node->name = name;
+    node->clipsContent = clipsContent;
+    node->rectangleCornerRadii = rectangleCornerRadii;
+    node->strokeDashes = strokeDashes;
+    node->textRuns = textRuns;
+    node->fillGeometry = fillGeometry;
+    node->constraintH = constraintH;
+    node->constraintV = constraintV;
+    node->autoLayout = autoLayout;
+    node->layoutGrow = layoutGrow;
+    node->layoutAlignStretch = layoutAlignStretch;
+    node->layoutAbsolute = layoutAbsolute;
+    node->numVarBindings = numVarBindings;
+    node->instanceOverrides = instanceOverrides;
+    node->blendMode = blendMode;
+    node->isMask = isMask;
+}
+
+WorldRect worldBounds(const Node& n) {
+    const Mat23& m = n.absoluteTransform;
+    const float xs[4] = {0, n.width, n.width, 0};
+    const float ys[4] = {0, 0, n.height, n.height};
+    WorldRect r;
+    r.x0 = r.y0 = 1e30f;
+    r.x1 = r.y1 = -1e30f;
+    for (int i = 0; i < 4; ++i) {
+        float x, y;
+        m.apply(xs[i], ys[i], x, y);
+        r.x0 = std::min(r.x0, x);
+        r.y0 = std::min(r.y0, y);
+        r.x1 = std::max(r.x1, x);
+        r.y1 = std::max(r.y1, y);
+    }
+    return r;
+}
+
+void EditorState::setStatus(const std::string& s, double seconds) {
+    status = s;
+    statusUntil = GetTime() + seconds;
+}
+
+void EditorState::selectPage(int index) {
+    auto& pages = file.document->root->children;
+    std::vector<Node*> canvases;
+    for (auto& c : pages)
+        if (c->type == figo::NodeType::Canvas) canvases.push_back(c.get());
+    if (canvases.empty()) {  // bare tree: treat root as the page
+        page = file.document->root.get();
+    } else {
+        pageIndex = ((index % static_cast<int>(canvases.size())) +
+                     static_cast<int>(canvases.size())) %
+                    static_cast<int>(canvases.size());
+        page = canvases[pageIndex];
+    }
+    scope = page;
+    selection.clear();
+    hovered = nullptr;
+    renderer.setFrame(page);
+    docDirty = true;
+    updateAbsoluteTransforms();
+    zoomToFit();
+}
+
+void EditorState::zoomToFit() {
+    if (!page) return;
+    // Bounds of all top-level frames (canvas coordinates).
+    float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
+    for (auto& c : page->children) {
+        if (!c->visible) continue;
+        const Mat23& m = c->relativeTransform;
+        x0 = std::min(x0, m.m02);
+        y0 = std::min(y0, m.m12);
+        x1 = std::max(x1, m.m02 + c->width);
+        y1 = std::max(y1, m.m12 + c->height);
+    }
+    if (x1 <= x0) {
+        x0 = y0 = 0;
+        x1 = y1 = 1000;
+    }
+    const float pad = 48;
+    const float vw = static_cast<float>(viewportW()), vh = static_cast<float>(viewportH());
+    const float z = std::min((vw - pad * 2) / (x1 - x0), (vh - pad * 2) / (y1 - y0));
+    cam.zoom = std::max(kZoomMin, std::min(kZoomMax, z));
+    cam.panX = (vw - (x1 - x0) * cam.zoom) * 0.5f - x0 * cam.zoom;
+    cam.panY = (vh - (y1 - y0) * cam.zoom) * 0.5f - y0 * cam.zoom;
+    lastViewChange = GetTime();
+    viewSettled = false;
+}
+
+bool EditorState::isSelected(Node* n) const {
+    return std::find(selection.begin(), selection.end(), n) != selection.end();
+}
+
+void EditorState::setSelection(std::vector<Node*> sel) { selection = std::move(sel); }
+
+void EditorState::beginGesture() {
+    gestureBefore.clear();
+    gestureChanged = false;
+    for (Node* n : selection) gestureBefore.push_back(NodeProps::capture(n));
+}
+
+void EditorState::commitGesture() {
+    if (!gestureChanged || gestureBefore.empty()) {
+        gestureBefore.clear();
+        return;
+    }
+    UndoEntry e;
+    e.before = std::move(gestureBefore);
+    for (const NodeProps& b : e.before) e.after.push_back(NodeProps::capture(b.node));
+    undoStack.push_back(std::move(e));
+    redoStack.clear();
+    gestureBefore.clear();
+    gestureChanged = false;
+    unsaved = true;
+}
+
+void EditorState::pushPropsUndo(std::vector<NodeProps> before) {
+    if (before.empty()) return;
+    UndoEntry e;
+    e.before = std::move(before);
+    for (const NodeProps& b : e.before) e.after.push_back(NodeProps::capture(b.node));
+    undoStack.push_back(std::move(e));
+    redoStack.clear();
+    unsaved = true;
+}
+
+void EditorState::pushVarsUndo(figo::VariableTable before,
+                               std::vector<NodeProps> nodesBefore) {
+    UndoEntry e;
+    e.vars = UndoEntry::VarsChange{std::move(before), file.document->variables};
+    e.before = std::move(nodesBefore);
+    for (const NodeProps& b : e.before) e.after.push_back(NodeProps::capture(b.node));
+    undoStack.push_back(std::move(e));
+    redoStack.clear();
+    unsaved = true;
+}
+
+void EditorState::deleteSelection() {
+    if (selection.empty()) return;
+    UndoEntry e;
+    for (Node* n : selection) {
+        if (!n->parent) continue;  // cannot delete a page/root
+        auto& siblings = n->parent->children;
+        for (size_t i = 0; i < siblings.size(); ++i) {
+            if (siblings[i].get() != n) continue;
+            TreeChange ch;
+            ch.isInsert = false;
+            ch.parent = n->parent;
+            ch.index = i;
+            ch.node = n;
+            ch.detached = std::move(siblings[i]);
+            siblings.erase(siblings.begin() + static_cast<long long>(i));
+            e.tree.push_back(std::move(ch));
+            break;
+        }
+    }
+    if (e.tree.empty()) return;
+    undoStack.push_back(std::move(e));
+    redoStack.clear();
+    selection.clear();
+    hovered = nullptr;
+    markDocChanged();
+    unsaved = true;
+}
+
+namespace {
+std::unique_ptr<Node> cloneSubtree(const Node& src, Node* parent) {
+    auto n = std::make_unique<Node>();
+    Node* raw = n.get();
+    // Copy all value members, then rebuild children with fresh parent links.
+    *raw = Node{};
+    raw->id = src.id + "-copy";
+    raw->name = src.name;
+    raw->type = src.type;
+    raw->visible = src.visible;
+    raw->opacity = src.opacity;
+    raw->relativeTransform = src.relativeTransform;
+    raw->width = src.width;
+    raw->height = src.height;
+    raw->clipsContent = src.clipsContent;
+    raw->fills = src.fills;
+    raw->strokes = src.strokes;
+    raw->strokeWeight = src.strokeWeight;
+    raw->strokeAlign = src.strokeAlign;
+    raw->strokeDashes = src.strokeDashes;
+    raw->strokeCap = src.strokeCap;
+    raw->strokeJoin = src.strokeJoin;
+    raw->cornerRadius = src.cornerRadius;
+    raw->rectangleCornerRadii = src.rectangleCornerRadii;
+    raw->fillGeometry = src.fillGeometry;
+    raw->strokeGeometry = src.strokeGeometry;
+    raw->effects = src.effects;
+    raw->characters = src.characters;
+    raw->textStyle = src.textStyle;
+    raw->textRuns = src.textRuns;
+    raw->parent = parent;
+    for (const auto& c : src.children) raw->children.push_back(cloneSubtree(*c, raw));
+    return n;
+}
+}  // namespace
+
+void EditorState::duplicateSelection() {
+    if (selection.empty()) return;
+    UndoEntry e;
+    std::vector<Node*> fresh;
+    for (Node* n : selection) {
+        if (!n->parent) continue;
+        auto copy = cloneSubtree(*n, n->parent);
+        copy->relativeTransform.m02 += 10;  // Figma offsets duplicates slightly
+        copy->relativeTransform.m12 += 10;
+        Node* raw = copy.get();
+        n->parent->children.push_back(std::move(copy));
+        TreeChange ch;
+        ch.isInsert = true;
+        ch.parent = n->parent;
+        ch.index = n->parent->children.size() - 1;
+        ch.node = raw;
+        e.tree.push_back(std::move(ch));
+        fresh.push_back(raw);
+    }
+    if (fresh.empty()) return;
+    undoStack.push_back(std::move(e));
+    redoStack.clear();
+    selection = fresh;
+    markDocChanged();
+    unsaved = true;
+}
+
+namespace {
+
+// A reparent (MCP move_node) records two changes for the same node — a
+// removal then an insertion — so the detached unique_ptr may be held by the
+// sibling change rather than the one being replayed.
+std::unique_ptr<Node> takeDetached(std::vector<TreeChange>& changes, TreeChange& ch) {
+    if (ch.detached) return std::move(ch.detached);
+    for (auto& other : changes) {
+        if (other.node == ch.node && other.detached) return std::move(other.detached);
+    }
+    return nullptr;
+}
+
+void applyTreeUndo(std::vector<TreeChange>& changes, bool undoing) {
+    auto detach = [](TreeChange& ch) {
+        auto& siblings = ch.parent->children;
+        for (size_t i = 0; i < siblings.size(); ++i) {
+            if (siblings[i].get() == ch.node) {
+                ch.detached = std::move(siblings[i]);
+                siblings.erase(siblings.begin() + static_cast<long long>(i));
+                break;
+            }
+        }
+    };
+    auto reinsert = [&changes](TreeChange& ch) {
+        auto holder = takeDetached(changes, ch);
+        if (!holder) return;  // defensive: node lost (should not happen)
+        auto& siblings = ch.parent->children;
+        const size_t at = std::min(ch.index, siblings.size());
+        siblings.insert(siblings.begin() + static_cast<long long>(at), std::move(holder));
+        ch.node->parent = ch.parent;  // reparent moves need the link restored
+    };
+    // Walk in reverse for undo so indices stay valid.
+    if (undoing) {
+        for (auto it = changes.rbegin(); it != changes.rend(); ++it) {
+            if (it->isInsert) detach(*it);   // undo an insertion → detach
+            else reinsert(*it);              // undo a removal → insert back
+        }
+    } else {
+        for (auto& ch : changes) {
+            if (ch.isInsert) reinsert(ch);
+            else detach(ch);
+        }
+    }
+}
+
+}  // namespace
+
+void EditorState::undo() {
+    if (undoStack.empty()) return;
+    UndoEntry e = std::move(undoStack.back());
+    undoStack.pop_back();
+    for (const NodeProps& p : e.before) p.apply();
+    applyTreeUndo(e.tree, true);
+    if (e.vars) {
+        file.document->variables = e.vars->before;
+        file.document->applyVariables();
+    }
+    selection.clear();
+    hovered = nullptr;
+    redoStack.push_back(std::move(e));
+    markDocChanged();
+    unsaved = true;
+}
+
+void EditorState::redo() {
+    if (redoStack.empty()) return;
+    UndoEntry e = std::move(redoStack.back());
+    redoStack.pop_back();
+    for (const NodeProps& p : e.after) p.apply();
+    applyTreeUndo(e.tree, false);
+    if (e.vars) {
+        file.document->variables = e.vars->after;
+        file.document->applyVariables();
+    }
+    selection.clear();
+    hovered = nullptr;
+    undoStack.push_back(std::move(e));
+    markDocChanged();
+    unsaved = true;
+}
+
+void EditorState::alignSelection(Align op) {
+    if (selection.empty()) return;
+    std::vector<NodeProps> before;
+    for (Node* n : selection) before.push_back(NodeProps::capture(n));
+
+    // Target box in world space.
+    WorldRect target;
+    if (selection.size() == 1) {
+        Node* parent = selection[0]->parent;
+        if (!parent || parent->width <= 0 || parent->height <= 0) return;
+        target = worldBounds(*parent);
+    } else {
+        target.x0 = target.y0 = 1e30f;
+        target.x1 = target.y1 = -1e30f;
+        for (Node* n : selection) {
+            const WorldRect b = worldBounds(*n);
+            target.x0 = std::min(target.x0, b.x0);
+            target.y0 = std::min(target.y0, b.y0);
+            target.x1 = std::max(target.x1, b.x1);
+            target.y1 = std::max(target.y1, b.y1);
+        }
+    }
+
+    bool changed = false;
+    for (Node* n : selection) {
+        const WorldRect b = worldBounds(*n);
+        float dx = 0, dy = 0;
+        switch (op) {
+        case Align::Left: dx = target.x0 - b.x0; break;
+        case Align::HCenter:
+            dx = (target.x0 + target.x1) * 0.5f - (b.x0 + b.x1) * 0.5f;
+            break;
+        case Align::Right: dx = target.x1 - b.x1; break;
+        case Align::Top: dy = target.y0 - b.y0; break;
+        case Align::VCenter:
+            dy = (target.y0 + target.y1) * 0.5f - (b.y0 + b.y1) * 0.5f;
+            break;
+        case Align::Bottom: dy = target.y1 - b.y1; break;
+        }
+        if (dx == 0 && dy == 0) continue;
+        // World delta → parent-local delta (parents usually translation-only).
+        float lx = dx, ly = dy;
+        if (n->parent) {
+            if (auto inv = n->parent->absoluteTransform.inverted()) {
+                lx = inv->m00 * dx + inv->m01 * dy;
+                ly = inv->m10 * dx + inv->m11 * dy;
+            }
+        }
+        n->relativeTransform.m02 = std::round(n->relativeTransform.m02 + lx);
+        n->relativeTransform.m12 = std::round(n->relativeTransform.m12 + ly);
+        bumpNode(n);
+        changed = true;
+    }
+    if (changed) pushPropsUndo(std::move(before));
+}
+
+void EditorState::markDocChanged() {
+    docDirty = true;
+    renderer.markDirty();
+    bumpAllFrames();
+    updateAbsoluteTransforms();
+}
+
+uint64_t EditorState::versionOf(Node* topChild) {
+    auto it = frameVersion.find(topChild);
+    return it == frameVersion.end() ? 0 : it->second;
+}
+
+void EditorState::bumpNode(Node* n) {
+    Node* top = n;
+    while (top && top->parent && top->parent != page) top = top->parent;
+    if (top) ++frameVersion[top];
+    docDirty = true;
+    updateAbsoluteTransforms();
+}
+
+void EditorState::bumpAllFrames() {
+    if (!page) return;
+    for (auto& c : page->children) ++frameVersion[c.get()];
+}
+
+void EditorState::invalidateCache() {
+    for (auto& [node, entry] : frameCache) {
+        if (entry.texValid) UnloadTexture(entry.tex);
+    }
+    frameCache.clear();
+    frameVersion.clear();
+    docDirty = true;
+}
+
+namespace {
+void updateAbs(Node& n, const Mat23& parentAbs) {
+    n.absoluteTransform = parentAbs * n.relativeTransform;
+    for (auto& c : n.children) updateAbs(*c, n.absoluteTransform);
+}
+}  // namespace
+
+void EditorState::updateAbsoluteTransforms() {
+    if (!page) return;
+    // Page space is world space: the page itself sits at identity.
+    page->absoluteTransform = Mat23::identity();
+    for (auto& c : page->children) updateAbs(*c, Mat23::identity());
+}
+
+}  // namespace figoedit

@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<body style="margin:0;background:#0c0e12">
+<pre id="log" style="position:absolute;left:440px;top:0;color:#9f9;font:12px monospace"></pre>
+<canvas id="canvas" width="420" height="900" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+<script>
+var logEl = document.getElementById('log');
+var Module = {
+  print: function() { var a = [].join.call(arguments, ' '); logEl.textContent += a + '\n'; },
+  printErr: function() { var a = [].join.call(arguments, ' '); logEl.textContent += 'E: ' + a + '\n'; },
+  canvas: document.getElementById('canvas'),
+};
+// After the app settles, synthesize real mouse events on the canvas — the
+// same path a user's click takes through emscripten's GLFW shim.
+setTimeout(function() {
+  var c = Module.canvas, r = c.getBoundingClientRect();
+  var pts = [[0.5, 0.3], [0.5, 0.5], [0.5, 0.7], [0.25, 0.95], [0.5, 0.05]];
+  var i = 0;
+  var next = function() {
+    if (i >= pts.length) return;
+    var x = r.left + r.width * pts[i][0], y = r.top + r.height * pts[i][1];
+    var ev = function(type) {
+      c.dispatchEvent(new MouseEvent(type, {bubbles: true, clientX: x, clientY: y, button: 0}));
+    };
+    ev('mousemove');
+    ev('mousedown');
+    // raylib polls per frame: down+up in one inter-frame gap cancel out, so
+    // hold the button across several frames like a real click does.
+    setTimeout(function() { ev('mouseup'); }, 300);
+    logEl.textContent += '[test] click ' + Math.round(x - r.left) + ',' + Math.round(y - r.top) + '\n';
+    ++i;
+    setTimeout(next, 1500);
+  };
+  next();
+}, 12000);
+</script>
+<script src="figoplay.js"></script>
+<script src="/slow"></script><!-- holds the load event open for ~25s -->
+</body>
+</html>

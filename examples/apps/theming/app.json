@@ -1,0 +1,12 @@
+{
+  "name": "Theming",
+  "design": "design.figo.json",
+  "script": "app.js",
+  "libs": ["../../../design-systems/theme/theme.js"],
+  "fonts": "../../../design-systems/components/fonts",
+  "viewport": [420, 900],
+  "entryFrame": "Preview",
+  "designSystem": "material",
+  "package": { "id": "com.figo.theming", "version": "1.0.0" },
+  "benchmark": true
+}

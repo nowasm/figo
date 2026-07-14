@@ -1,0 +1,10 @@
+build/
+*.bmp
+*.png
+!docs/**/*.png
+build_web/
+build_android/
+node_modules/
+
+# figoplay localStorage persistence (bench/dev byproduct)
+*.storage.json

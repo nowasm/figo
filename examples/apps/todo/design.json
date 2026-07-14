@@ -1,0 +1,714 @@
+{
+ "name": "Todo",
+ "document": {
+  "id": "30:0",
+  "name": "Document",
+  "type": "DOCUMENT",
+  "children": [
+   {
+    "id": "30:1",
+    "name": "Page 1",
+    "type": "CANVAS",
+    "children": [
+     {
+      "id": "30:18",
+      "name": "Todo",
+      "type": "FRAME",
+      "visible": true,
+      "size": {
+       "x": 420,
+       "y": 900
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "clipsContent": true,
+      "cornerRadius": 0,
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 1.0,
+         "g": 1.0,
+         "b": 1.0,
+         "a": 1.0
+        }
+       }
+      ],
+      "children": [
+       {
+        "id": "30:2",
+        "name": "Kicker",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 200,
+         "y": 18
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          56
+         ]
+        ],
+        "characters": "今日待办",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.3254901960784314,
+           "g": 0.22745098039215686,
+           "b": 0.9921568627450981,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 700,
+         "fontSize": 13,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 1.5
+        }
+       },
+       {
+        "id": "30:3",
+        "name": "Title",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 280,
+         "y": 42
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          78
+         ]
+        ],
+        "characters": "待办清单",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.023529411764705882,
+           "g": 0.10588235294117647,
+           "b": 0.19215686274509805,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 700,
+         "fontSize": 32,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": -0.6
+        }
+       },
+       {
+        "id": "30:4",
+        "name": "RemainLabel",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 20
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          128
+         ]
+        ],
+        "characters": "还剩 5 项",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.39215686274509803,
+           "g": 0.4549019607843137,
+           "b": 0.5529411764705883,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 14,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "30:9",
+        "name": "AddCard",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 64
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          164
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 8,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9647058823529412,
+           "g": 0.9764705882352941,
+           "b": 0.9882352941176471,
+           "a": 1.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "30:5",
+          "name": "NextHint",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 200,
+           "y": 16
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            16
+           ],
+           [
+            0,
+            1,
+            11
+           ]
+          ],
+          "characters": "接下来",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.39215686274509803,
+             "g": 0.4549019607843137,
+             "b": 0.5529411764705883,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 400,
+           "fontSize": 12,
+           "textAlignHorizontal": "LEFT",
+           "textAlignVertical": "TOP",
+           "letterSpacing": 0
+          }
+         },
+         {
+          "id": "30:6",
+          "name": "NextLabel",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 256,
+           "y": 20
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            16
+           ],
+           [
+            0,
+            1,
+            30
+           ]
+          ],
+          "characters": "给妈妈回个电话",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.15294117647058825,
+             "g": 0.2235294117647059,
+             "b": 0.3176470588235294,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 600,
+           "fontSize": 14,
+           "textAlignHorizontal": "LEFT",
+           "textAlignVertical": "TOP",
+           "letterSpacing": 0
+          }
+         },
+         {
+          "id": "30:8",
+          "name": "AddBtn",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 64,
+           "y": 32
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            292
+           ],
+           [
+            0,
+            1,
+            16
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 6,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.3254901960784314,
+             "g": 0.22745098039215686,
+             "b": 0.9921568627450981,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "30:7",
+            "name": "AddBtn Label",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 64,
+             "y": 32
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "添加",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 700,
+             "fontSize": 14,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "30:16",
+        "name": "TaskList",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 582
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          252
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 0,
+        "fills": [],
+        "children": [
+         {
+          "id": "30:15",
+          "name": "TaskRow",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 372,
+           "y": 64
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 8,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "30:10",
+            "name": "CheckOff",
+            "type": "ELLIPSE",
+            "visible": true,
+            "size": {
+             "x": 22,
+             "y": 22
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              20
+             ],
+             [
+              0,
+              1,
+              21
+             ]
+            ],
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "strokes": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.39215686274509803,
+               "g": 0.4549019607843137,
+               "b": 0.5529411764705883,
+               "a": 1.0
+              }
+             }
+            ],
+            "strokeWeight": 1.5
+           },
+           {
+            "id": "30:12",
+            "name": "CheckOn",
+            "type": "FRAME",
+            "visible": false,
+            "size": {
+             "x": 22,
+             "y": 22
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              20
+             ],
+             [
+              0,
+              1,
+              21
+             ]
+            ],
+            "clipsContent": false,
+            "cornerRadius": 11,
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.3254901960784314,
+               "g": 0.22745098039215686,
+               "b": 0.9921568627450981,
+               "a": 1.0
+              }
+             }
+            ],
+            "children": [
+             {
+              "id": "30:11",
+              "name": "CheckOn Glyph",
+              "type": "TEXT",
+              "visible": true,
+              "size": {
+               "x": 22,
+               "y": 22
+              },
+              "relativeTransform": [
+               [
+                1,
+                0,
+                0
+               ],
+               [
+                0,
+                1,
+                0
+               ]
+              ],
+              "characters": "✓",
+              "fills": [
+               {
+                "type": "SOLID",
+                "color": {
+                 "r": 1.0,
+                 "g": 1.0,
+                 "b": 1.0,
+                 "a": 1.0
+                }
+               }
+              ],
+              "style": {
+               "fontFamily": "Segoe UI",
+               "fontWeight": 700,
+               "fontSize": 12,
+               "textAlignHorizontal": "CENTER",
+               "textAlignVertical": "CENTER",
+               "letterSpacing": 0
+              }
+             }
+            ]
+           },
+           {
+            "id": "30:13",
+            "name": "TaskText",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 294,
+             "y": 64
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              58
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "任务",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.023529411764705882,
+               "g": 0.10588235294117647,
+               "b": 0.19215686274509805,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 16,
+             "textAlignHorizontal": "LEFT",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           },
+           {
+            "id": "30:14",
+            "name": "TaskTextDone",
+            "type": "TEXT",
+            "visible": false,
+            "size": {
+             "x": 294,
+             "y": 64
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              58
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "任务",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.39215686274509803,
+               "g": 0.4549019607843137,
+               "b": 0.5529411764705883,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 16,
+             "textAlignHorizontal": "LEFT",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           }
+          ],
+          "strokes": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.8980392156862745,
+             "g": 0.9294117647058824,
+             "b": 0.9607843137254902,
+             "a": 1.0
+            }
+           }
+          ],
+          "strokeWeight": 1
+         }
+        ],
+        "layoutMode": "VERTICAL",
+        "itemSpacing": 10,
+        "primaryAxisSizingMode": "AUTO",
+        "counterAxisSizingMode": "FIXED",
+        "paddingLeft": 0,
+        "paddingRight": 0,
+        "paddingTop": 0,
+        "paddingBottom": 0
+       },
+       {
+        "id": "30:17",
+        "name": "GestureHint",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          856
+         ]
+        ],
+        "characters": "点按完成 · 左滑删除 · 长按置顶",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.39215686274509803,
+           "g": 0.4549019607843137,
+           "b": 0.5529411764705883,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,1887 @@
+{
+ "name": "Calendar",
+ "document": {
+  "id": "40:0",
+  "name": "Document",
+  "type": "DOCUMENT",
+  "children": [
+   {
+    "id": "40:1",
+    "name": "Page 1",
+    "type": "CANVAS",
+    "children": [
+     {
+      "id": "40:47",
+      "name": "Month",
+      "type": "FRAME",
+      "size": {
+       "x": 420,
+       "y": 900
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "clipsContent": true,
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 0.0,
+         "g": 0.0,
+         "b": 0.0,
+         "a": 1.0
+        }
+       }
+      ],
+      "children": [
+       {
+        "id": "40:13",
+        "name": "MonthTitle",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 300,
+         "y": 44
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          56
+         ]
+        ],
+        "characters": "2026年7月",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 600,
+         "fontSize": 32,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": -0.8
+        }
+       },
+       {
+        "id": "40:14",
+        "name": "Wd0",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 53,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          124
+         ]
+        ],
+        "characters": "一",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.4
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:15",
+        "name": "Wd1",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 53,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          77
+         ],
+         [
+          0,
+          1,
+          124
+         ]
+        ],
+        "characters": "二",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.4
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:16",
+        "name": "Wd2",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 53,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          130
+         ],
+         [
+          0,
+          1,
+          124
+         ]
+        ],
+        "characters": "三",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.4
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:17",
+        "name": "Wd3",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 53,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          183
+         ],
+         [
+          0,
+          1,
+          124
+         ]
+        ],
+        "characters": "四",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.4
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:18",
+        "name": "Wd4",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 53,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          236
+         ],
+         [
+          0,
+          1,
+          124
+         ]
+        ],
+        "characters": "五",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.4
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:19",
+        "name": "Wd5",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 53,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          289
+         ],
+         [
+          0,
+          1,
+          124
+         ]
+        ],
+        "characters": "六",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.4
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:20",
+        "name": "Wd6",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 53,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          342
+         ],
+         [
+          0,
+          1,
+          124
+         ]
+        ],
+        "characters": "日",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.4
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:8",
+        "name": "MonthGrid",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 371,
+         "y": 348
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          152
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 0,
+        "fills": [],
+        "children": [
+         {
+          "id": "40:7",
+          "name": "DayCell",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 53,
+           "y": 58
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 0.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:2",
+            "name": "SelBg",
+            "type": "FRAME",
+            "visible": false,
+            "size": {
+             "x": 40,
+             "y": 40
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              6.5
+             ],
+             [
+              0,
+              1,
+              6
+             ]
+            ],
+            "clipsContent": false,
+            "cornerRadius": 20.0,
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "children": []
+           },
+           {
+            "id": "40:3",
+            "name": "TodayRing",
+            "type": "ELLIPSE",
+            "visible": false,
+            "size": {
+             "x": 40,
+             "y": 40
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              6.5
+             ],
+             [
+              0,
+              1,
+              6
+             ]
+            ],
+            "fills": [],
+            "strokes": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.0,
+               "g": 0.6,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "strokeWeight": 2
+           },
+           {
+            "id": "40:4",
+            "name": "DayNum",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 53,
+             "y": 40
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              6
+             ]
+            ],
+            "characters": "1",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 15,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           },
+           {
+            "id": "40:5",
+            "name": "DayNumSel",
+            "type": "TEXT",
+            "visible": false,
+            "size": {
+             "x": 53,
+             "y": 40
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              6
+             ]
+            ],
+            "characters": "1",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.0,
+               "g": 0.0,
+               "b": 0.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 600,
+             "fontSize": 15,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           },
+           {
+            "id": "40:6",
+            "name": "Dot",
+            "type": "ELLIPSE",
+            "visible": false,
+            "size": {
+             "x": 5,
+             "y": 5
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              24.0
+             ],
+             [
+              0,
+              1,
+              49
+             ]
+            ],
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.0,
+               "g": 0.6,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "layoutMode": "HORIZONTAL",
+        "layoutWrap": "WRAP",
+        "itemSpacing": 0,
+        "primaryAxisSizingMode": "FIXED",
+        "counterAxisSizingMode": "FIXED",
+        "minWidth": 371,
+        "maxWidth": 371
+       },
+       {
+        "id": "40:21",
+        "name": "Divider",
+        "type": "RECTANGLE",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 1
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          512
+         ]
+        ],
+        "cornerRadius": 0,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.06
+          }
+         }
+        ]
+       },
+       {
+        "id": "40:22",
+        "name": "AgendaTitle",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 220,
+         "y": 26
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          526
+         ]
+        ],
+        "characters": "7月2日",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 600,
+         "fontSize": 18,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:23",
+        "name": "AgendaCount",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 176,
+         "y": 18
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          220
+         ],
+         [
+          0,
+          1,
+          531
+         ]
+        ],
+        "characters": "",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.6
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "RIGHT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:12",
+        "name": "AgendaList",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 248
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          564
+         ]
+        ],
+        "clipsContent": true,
+        "cornerRadius": 0,
+        "fills": [],
+        "children": [
+         {
+          "id": "40:11",
+          "name": "EvRow",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 372,
+           "y": 56
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 12,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.03529411764705882,
+             "g": 0.03529411764705882,
+             "b": 0.03529411764705882,
+             "a": 1.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:9",
+            "name": "EvTime",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 60,
+             "y": 56
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              16
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "10:00",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 0.0,
+               "g": 0.6,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 600,
+             "fontSize": 14,
+             "textAlignHorizontal": "LEFT",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           },
+           {
+            "id": "40:10",
+            "name": "EvTitle",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 264,
+             "y": 56
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              92
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "组会",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 15,
+             "textAlignHorizontal": "LEFT",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           }
+          ],
+          "strokes": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 0.06
+            }
+           }
+          ],
+          "strokeWeight": 1
+         }
+        ],
+        "overflowDirection": "VERTICAL_SCROLLING",
+        "layoutMode": "VERTICAL",
+        "itemSpacing": 8,
+        "primaryAxisSizingMode": "FIXED",
+        "counterAxisSizingMode": "FIXED"
+       },
+       {
+        "id": "40:24",
+        "name": "EmptyState",
+        "type": "TEXT",
+        "visible": false,
+        "size": {
+         "x": 372,
+         "y": 20
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          640
+         ]
+        ],
+        "characters": "这一天还没有日程",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.6
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 14,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:26",
+        "name": "AddBtn",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 54
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          826
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 27,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:25",
+          "name": "AddBtnLabel",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 372,
+           "y": 54
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "+ 添加日程",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.0,
+             "g": 0.0,
+             "b": 0.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 600,
+           "fontSize": 15,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "40:48",
+      "name": "NewEvent",
+      "type": "FRAME",
+      "size": {
+       "x": 420,
+       "y": 900
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        460
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "clipsContent": true,
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 0.0,
+         "g": 0.0,
+         "b": 0.0,
+         "a": 1.0
+        }
+       }
+      ],
+      "children": [
+       {
+        "id": "40:28",
+        "name": "BtnCancel",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 80,
+         "y": 44
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          16
+         ],
+         [
+          0,
+          1,
+          56
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 0,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:27",
+          "name": "BtnCancelLabel",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 72,
+           "y": 44
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            8
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "取消",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.0,
+             "g": 0.6,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 400,
+           "fontSize": 15,
+           "textAlignHorizontal": "LEFT",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": "40:29",
+        "name": "PageTitle",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 200,
+         "y": 44
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          110
+         ],
+         [
+          0,
+          1,
+          56
+         ]
+        ],
+        "characters": "新建日程",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 600,
+         "fontSize": 15,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "CENTER",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:31",
+        "name": "BtnSave",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 80,
+         "y": 44
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          324
+         ],
+         [
+          0,
+          1,
+          56
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 0,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:30",
+          "name": "BtnSaveLabel",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 72,
+           "y": 44
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "保存",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.0,
+             "g": 0.6,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 600,
+           "fontSize": 15,
+           "textAlignHorizontal": "RIGHT",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": "40:32",
+        "name": "TitleCaption",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 120,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          130
+         ]
+        ],
+        "characters": "标题",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.6
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:35",
+        "name": "InputBox",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 54
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          152
+         ]
+        ],
+        "clipsContent": false,
+        "cornerRadius": 12,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.03529411764705882,
+           "g": 0.03529411764705882,
+           "b": 0.03529411764705882,
+           "a": 1.0
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "40:33",
+          "name": "TitlePlaceholder",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 340,
+           "y": 54
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            16
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "输入标题",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 0.4
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 400,
+           "fontSize": 15,
+           "textAlignHorizontal": "LEFT",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         },
+         {
+          "id": "40:34",
+          "name": "TitleInput",
+          "type": "TEXT",
+          "visible": true,
+          "size": {
+           "x": 340,
+           "y": 54
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            16
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "",
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            }
+           }
+          ],
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontWeight": 400,
+           "fontSize": 15,
+           "textAlignHorizontal": "LEFT",
+           "textAlignVertical": "CENTER",
+           "letterSpacing": 0
+          }
+         }
+        ],
+        "strokes": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.06
+          }
+         }
+        ],
+        "strokeWeight": 1
+       },
+       {
+        "id": "40:36",
+        "name": "TimeCaption",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 120,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          240
+         ]
+        ],
+        "characters": "时间",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.6
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:37",
+        "name": "PreviewTime",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 80
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          262
+         ]
+        ],
+        "characters": "09:00",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 600,
+         "fontSize": 62,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": -3
+        }
+       },
+       {
+        "id": "40:38",
+        "name": "SelectionBand",
+        "type": "RECTANGLE",
+        "visible": true,
+        "size": {
+         "x": 340,
+         "y": 56
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          532
+         ]
+        ],
+        "cornerRadius": 12,
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.06
+          }
+         }
+        ]
+       },
+       {
+        "id": "40:41",
+        "name": "HourWheel",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 120,
+         "y": 280
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          70
+         ],
+         [
+          0,
+          1,
+          420
+         ]
+        ],
+        "clipsContent": true,
+        "cornerRadius": 0,
+        "fills": [],
+        "children": [
+         {
+          "id": "40:40",
+          "name": "HourItem",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 120,
+           "y": 56
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 0.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:39",
+            "name": "HourText",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 120,
+             "y": 56
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "09",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 22,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           }
+          ]
+         }
+        ],
+        "overflowDirection": "VERTICAL_SCROLLING",
+        "layoutMode": "VERTICAL",
+        "itemSpacing": 0,
+        "paddingTop": 112,
+        "primaryAxisSizingMode": "FIXED",
+        "counterAxisSizingMode": "FIXED"
+       },
+       {
+        "id": "40:42",
+        "name": "Colon",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 40,
+         "y": 56
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          190
+         ],
+         [
+          0,
+          1,
+          532
+         ]
+        ],
+        "characters": ":",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 1.0
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 22,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "CENTER",
+         "letterSpacing": 0
+        }
+       },
+       {
+        "id": "40:45",
+        "name": "MinuteWheel",
+        "type": "FRAME",
+        "visible": true,
+        "size": {
+         "x": 120,
+         "y": 280
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          230
+         ],
+         [
+          0,
+          1,
+          420
+         ]
+        ],
+        "clipsContent": true,
+        "cornerRadius": 0,
+        "fills": [],
+        "children": [
+         {
+          "id": "40:44",
+          "name": "MinuteItem",
+          "type": "FRAME",
+          "visible": true,
+          "size": {
+           "x": 120,
+           "y": 56
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "clipsContent": false,
+          "cornerRadius": 0,
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 0.0
+            }
+           }
+          ],
+          "children": [
+           {
+            "id": "40:43",
+            "name": "MinuteText",
+            "type": "TEXT",
+            "visible": true,
+            "size": {
+             "x": 120,
+             "y": 56
+            },
+            "relativeTransform": [
+             [
+              1,
+              0,
+              0
+             ],
+             [
+              0,
+              1,
+              0
+             ]
+            ],
+            "characters": "00",
+            "fills": [
+             {
+              "type": "SOLID",
+              "color": {
+               "r": 1.0,
+               "g": 1.0,
+               "b": 1.0,
+               "a": 1.0
+              }
+             }
+            ],
+            "style": {
+             "fontFamily": "Segoe UI",
+             "fontWeight": 400,
+             "fontSize": 22,
+             "textAlignHorizontal": "CENTER",
+             "textAlignVertical": "CENTER",
+             "letterSpacing": 0
+            }
+           }
+          ]
+         }
+        ],
+        "overflowDirection": "VERTICAL_SCROLLING",
+        "layoutMode": "VERTICAL",
+        "itemSpacing": 0,
+        "paddingTop": 112,
+        "primaryAxisSizingMode": "FIXED",
+        "counterAxisSizingMode": "FIXED"
+       },
+       {
+        "id": "40:46",
+        "name": "WheelHint",
+        "type": "TEXT",
+        "visible": true,
+        "size": {
+         "x": 372,
+         "y": 16
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          724
+         ]
+        ],
+        "characters": "上下滑动选择时间",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 1.0,
+           "b": 1.0,
+           "a": 0.6
+          }
+         }
+        ],
+        "style": {
+         "fontFamily": "Segoe UI",
+         "fontWeight": 400,
+         "fontSize": 12,
+         "textAlignHorizontal": "CENTER",
+         "textAlignVertical": "TOP",
+         "letterSpacing": 0
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

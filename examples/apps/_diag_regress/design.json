@@ -1,0 +1,322 @@
+{
+ "name": "DiagRegress",
+ "document": {
+  "id": "0:0",
+  "type": "DOCUMENT",
+  "children": [
+   {
+    "id": "0:1",
+    "name": "Page 1",
+    "type": "CANVAS",
+    "children": [
+     {
+      "id": "1:1",
+      "name": "Main",
+      "type": "FRAME",
+      "size": {
+       "x": 420,
+       "y": 900
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 1,
+         "g": 1,
+         "b": 1,
+         "a": 1
+        }
+       }
+      ],
+      "children": [
+       {
+        "id": "2:1",
+        "name": "TightLabel",
+        "type": "TEXT",
+        "size": {
+         "x": 190,
+         "y": 22
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          60
+         ]
+        ],
+        "characters": "Confirm payment now",
+        "style": {
+         "fontFamily": "Helvetica",
+         "fontSize": 16
+        },
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.1,
+           "g": 0.1,
+           "b": 0.1,
+           "a": 1
+          }
+         }
+        ]
+       },
+       {
+        "id": "2:2",
+        "name": "RoomyLabel",
+        "type": "TEXT",
+        "size": {
+         "x": 360,
+         "y": 22
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          120
+         ]
+        ],
+        "characters": "Confirm payment now",
+        "style": {
+         "fontFamily": "Helvetica",
+         "fontSize": 16
+        },
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.1,
+           "g": 0.1,
+           "b": 0.1,
+           "a": 1
+          }
+         }
+        ]
+       },
+       {
+        "id": "3:1",
+        "name": "TinyBtn",
+        "type": "RECTANGLE",
+        "size": {
+         "x": 32,
+         "y": 28
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          200
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9,
+           "g": 0.35,
+           "b": 0.3,
+           "a": 1
+          }
+         }
+        ]
+       },
+       {
+        "id": "3:2",
+        "name": "BigBtn",
+        "type": "RECTANGLE",
+        "size": {
+         "x": 120,
+         "y": 48
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          260
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.25,
+           "g": 0.45,
+           "b": 0.9,
+           "a": 1
+          }
+         }
+        ]
+       },
+       {
+        "id": "6:1",
+        "name": "StatelessBtn",
+        "type": "INSTANCE",
+        "componentId": "5:1",
+        "size": {
+         "x": 120,
+         "y": 48
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          40
+         ],
+         [
+          0,
+          1,
+          400
+         ]
+        ],
+        "children": [
+         {
+          "id": "6:2",
+          "name": "PlainBg",
+          "type": "RECTANGLE",
+          "size": {
+           "x": 120,
+           "y": 48
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.25,
+             "g": 0.45,
+             "b": 0.9,
+             "a": 1
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "5:0",
+      "name": "PlainBtn",
+      "type": "COMPONENT_SET",
+      "size": {
+       "x": 120,
+       "y": 48
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        600
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "children": [
+       {
+        "id": "5:1",
+        "name": "Look=Plain",
+        "type": "COMPONENT",
+        "size": {
+         "x": 120,
+         "y": 48
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          0
+         ],
+         [
+          0,
+          1,
+          0
+         ]
+        ],
+        "children": [
+         {
+          "id": "5:2",
+          "name": "PlainBg",
+          "type": "RECTANGLE",
+          "size": {
+           "x": 120,
+           "y": 48
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.25,
+             "g": 0.45,
+             "b": 0.9,
+             "a": 1
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

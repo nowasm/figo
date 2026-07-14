@@ -1,0 +1,2204 @@
+{
+ "name": "calculator",
+ "variables": {
+  "modes": [
+   "light",
+   "dark"
+  ],
+  "activeMode": "light",
+  "colors": {
+   "background": [
+    "#fdf7ff",
+    "#141218"
+   ],
+   "error": [
+    "#ba1a1a",
+    "#ffb4ab"
+   ],
+   "error-container": [
+    "#ffdad6",
+    "#93000a"
+   ],
+   "error-dim": [
+    "#a80710",
+    "#ff554a"
+   ],
+   "inverse-on-surface": [
+    "#f5eff7",
+    "#322f35"
+   ],
+   "inverse-primary": [
+    "#cfbdfe",
+    "#65558f"
+   ],
+   "inverse-surface": [
+    "#322f35",
+    "#e6e0e9"
+   ],
+   "on-background": [
+    "#1d1b20",
+    "#e6e0e9"
+   ],
+   "on-error": [
+    "#ffffff",
+    "#690005"
+   ],
+   "on-error-container": [
+    "#93000a",
+    "#ffdad6"
+   ],
+   "on-primary": [
+    "#ffffff",
+    "#36275d"
+   ],
+   "on-primary-container": [
+    "#4d3d75",
+    "#e9ddff"
+   ],
+   "on-primary-fixed": [
+    "#201047",
+    "#201047"
+   ],
+   "on-primary-fixed-variant": [
+    "#4d3d75",
+    "#4d3d75"
+   ],
+   "on-secondary": [
+    "#ffffff",
+    "#332d41"
+   ],
+   "on-secondary-container": [
+    "#4a4458",
+    "#e8def8"
+   ],
+   "on-secondary-fixed": [
+    "#1e192b",
+    "#1e192b"
+   ],
+   "on-secondary-fixed-variant": [
+    "#4a4458",
+    "#4a4458"
+   ],
+   "on-success": [
+    "#ffffff",
+    "#003920"
+   ],
+   "on-success-container": [
+    "#002111",
+    "#92f7bc"
+   ],
+   "on-surface": [
+    "#1d1b20",
+    "#e6e0e9"
+   ],
+   "on-surface-variant": [
+    "#49454e",
+    "#cac4cf"
+   ],
+   "on-tertiary": [
+    "#ffffff",
+    "#4a2532"
+   ],
+   "on-tertiary-container": [
+    "#633b48",
+    "#ffd9e3"
+   ],
+   "on-tertiary-fixed": [
+    "#31101d",
+    "#31101d"
+   ],
+   "on-tertiary-fixed-variant": [
+    "#633b48",
+    "#633b48"
+   ],
+   "on-warning": [
+    "#ffffff",
+    "#3a3000"
+   ],
+   "on-warning-container": [
+    "#221b00",
+    "#ffe169"
+   ],
+   "outline": [
+    "#7a757f",
+    "#948f99"
+   ],
+   "outline-variant": [
+    "#cac4cf",
+    "#49454e"
+   ],
+   "primary": [
+    "#65558f",
+    "#cfbdfe"
+   ],
+   "primary-container": [
+    "#e9ddff",
+    "#4d3d75"
+   ],
+   "primary-dim": [
+    "#594982",
+    "#c7b4f5"
+   ],
+   "primary-fixed": [
+    "#e9ddff",
+    "#e9ddff"
+   ],
+   "primary-fixed-dim": [
+    "#cfbdfe",
+    "#cfbdfe"
+   ],
+   "scrim": [
+    "#000000",
+    "#000000"
+   ],
+   "secondary": [
+    "#625b71",
+    "#cbc2db"
+   ],
+   "secondary-container": [
+    "#e8def8",
+    "#4a4458"
+   ],
+   "secondary-dim": [
+    "#564f64",
+    "#e8def8"
+   ],
+   "secondary-fixed": [
+    "#e8def8",
+    "#e8def8"
+   ],
+   "secondary-fixed-dim": [
+    "#cbc2db",
+    "#cbc2db"
+   ],
+   "shadow": [
+    "#000000",
+    "#000000"
+   ],
+   "success": [
+    "#006d43",
+    "#76daa1"
+   ],
+   "success-container": [
+    "#92f7bc",
+    "#005231"
+   ],
+   "surface": [
+    "#fdf7ff",
+    "#141218"
+   ],
+   "surface-bright": [
+    "#fdf7ff",
+    "#3b383e"
+   ],
+   "surface-container": [
+    "#f2ecf4",
+    "#211f24"
+   ],
+   "surface-container-high": [
+    "#ece6ee",
+    "#2b292f"
+   ],
+   "surface-container-highest": [
+    "#e6e0e9",
+    "#36343a"
+   ],
+   "surface-container-low": [
+    "#f8f2fa",
+    "#1d1b20"
+   ],
+   "surface-container-lowest": [
+    "#ffffff",
+    "#0f0d13"
+   ],
+   "surface-dim": [
+    "#ded8e0",
+    "#141218"
+   ],
+   "surface-tint": [
+    "#65558f",
+    "#cfbdfe"
+   ],
+   "surface-variant": [
+    "#e7e0eb",
+    "#49454e"
+   ],
+   "tertiary": [
+    "#7e5260",
+    "#efb8c8"
+   ],
+   "tertiary-container": [
+    "#ffd9e3",
+    "#633b48"
+   ],
+   "tertiary-dim": [
+    "#704654",
+    "#fec5d6"
+   ],
+   "tertiary-fixed": [
+    "#ffd9e3",
+    "#ffd9e3"
+   ],
+   "tertiary-fixed-dim": [
+    "#efb8c8",
+    "#efb8c8"
+   ],
+   "warning": [
+    "#6f5d00",
+    "#e2c54b"
+   ],
+   "warning-container": [
+    "#ffe169",
+    "#544600"
+   ]
+  }
+ },
+ "document": {
+  "id": "0:0",
+  "name": "calculator",
+  "type": "DOCUMENT",
+  "children": [
+   {
+    "id": "page:main",
+    "name": "Main",
+    "type": "CANVAS",
+    "backgroundColor": {
+     "r": 0.9411764705882353,
+     "g": 0.9411764705882353,
+     "b": 0.9529411764705882,
+     "a": 1.0
+    },
+    "children": [
+     {
+      "id": "frame:calculator",
+      "name": "Calculator",
+      "type": "FRAME",
+      "size": {
+       "x": 420,
+       "y": 900
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 0.9921568627450981,
+         "g": 0.9686274509803922,
+         "b": 1.0,
+         "a": 1.0
+        },
+        "colorVar": "surface"
+       }
+      ],
+      "clipsContent": true,
+      "children": [
+       {
+        "id": "n:40",
+        "name": "Title",
+        "type": "TEXT",
+        "size": {
+         "x": 200,
+         "y": 32
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          28
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.28627450980392155,
+           "g": 0.27058823529411763,
+           "b": 0.3058823529411765,
+           "a": 1.0
+          },
+          "colorVar": "on-surface-variant"
+         }
+        ],
+        "characters": "Calculator",
+        "style": {
+         "fontFamily": "Roboto",
+         "fontSize": 16,
+         "fontWeight": 500,
+         "textAlignHorizontal": "LEFT",
+         "textAlignVertical": "CENTER"
+        }
+       },
+       {
+        "id": "calc-stateoff:1",
+        "name": "ThemeSwitch",
+        "type": "INSTANCE",
+        "size": {
+         "x": 52,
+         "y": 32
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          348
+         ],
+         [
+          0,
+          1,
+          28
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9921568627450981,
+           "g": 0.9686274509803922,
+           "b": 1.0,
+           "a": 1.0
+          },
+          "colorVar": "surface",
+          "opacity": 0.0
+         }
+        ],
+        "strokes": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.47843137254901963,
+           "g": 0.4588235294117647,
+           "b": 0.4980392156862745,
+           "a": 1.0
+          },
+          "colorVar": "outline"
+         }
+        ],
+        "strokeWeight": 2.0,
+        "strokeAlign": "INSIDE",
+        "cornerRadius": 16,
+        "children": [
+         {
+          "id": "calc-thumb:1",
+          "name": "Thumb",
+          "type": "ELLIPSE",
+          "size": {
+           "x": 16,
+           "y": 16
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            8
+           ],
+           [
+            0,
+            1,
+            8
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.47843137254901963,
+             "g": 0.4588235294117647,
+             "b": 0.4980392156862745,
+             "a": 1.0
+            },
+            "colorVar": "outline"
+           }
+          ]
+         }
+        ],
+        "componentId": "stateoff:1"
+       },
+       {
+        "id": "n:41",
+        "name": "Expression",
+        "type": "TEXT",
+        "size": {
+         "x": 380,
+         "y": 30
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          334
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.28627450980392155,
+           "g": 0.27058823529411763,
+           "b": 0.3058823529411765,
+           "a": 1.0
+          },
+          "colorVar": "on-surface-variant"
+         }
+        ],
+        "characters": "",
+        "style": {
+         "fontFamily": "Roboto",
+         "fontSize": 20,
+         "fontWeight": 400,
+         "textAlignHorizontal": "RIGHT",
+         "textAlignVertical": "CENTER"
+        }
+       },
+       {
+        "id": "n:42",
+        "name": "Result",
+        "type": "TEXT",
+        "size": {
+         "x": 380,
+         "y": 72
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          366
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.11372549019607843,
+           "g": 0.10588235294117647,
+           "b": 0.12549019607843137,
+           "a": 1.0
+          },
+          "colorVar": "on-surface"
+         }
+        ],
+        "characters": "0",
+        "style": {
+         "fontFamily": "Roboto",
+         "fontSize": 56,
+         "fontWeight": 400,
+         "textAlignHorizontal": "RIGHT",
+         "textAlignVertical": "CENTER"
+        }
+       },
+       {
+        "id": "n:1",
+        "name": "KeyClear",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          462
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 0.8509803921568627,
+           "b": 0.8901960784313725,
+           "a": 1.0
+          },
+          "colorVar": "tertiary-container"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:2",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.38823529411764707,
+             "g": 0.23137254901960785,
+             "b": 0.2823529411764706,
+             "a": 1.0
+            },
+            "colorVar": "on-tertiary-container"
+           }
+          ],
+          "characters": "AC",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:3",
+        "name": "KeySign",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          118
+         ],
+         [
+          0,
+          1,
+          462
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 0.8509803921568627,
+           "b": 0.8901960784313725,
+           "a": 1.0
+          },
+          "colorVar": "tertiary-container"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:4",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.38823529411764707,
+             "g": 0.23137254901960785,
+             "b": 0.2823529411764706,
+             "a": 1.0
+            },
+            "colorVar": "on-tertiary-container"
+           }
+          ],
+          "characters": "±",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:5",
+        "name": "KeyPct",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          216
+         ],
+         [
+          0,
+          1,
+          462
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1.0,
+           "g": 0.8509803921568627,
+           "b": 0.8901960784313725,
+           "a": 1.0
+          },
+          "colorVar": "tertiary-container"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:6",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.38823529411764707,
+             "g": 0.23137254901960785,
+             "b": 0.2823529411764706,
+             "a": 1.0
+            },
+            "colorVar": "on-tertiary-container"
+           }
+          ],
+          "characters": "%",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:7",
+        "name": "KeyDiv",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          314
+         ],
+         [
+          0,
+          1,
+          462
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9098039215686274,
+           "g": 0.8705882352941177,
+           "b": 0.9725490196078431,
+           "a": 1.0
+          },
+          "colorVar": "secondary-container"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:8",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.2901960784313726,
+             "g": 0.26666666666666666,
+             "b": 0.34509803921568627,
+             "a": 1.0
+            },
+            "colorVar": "on-secondary-container"
+           }
+          ],
+          "characters": "÷",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:9",
+        "name": "Key7",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          548
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:10",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "7",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:11",
+        "name": "Key8",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          118
+         ],
+         [
+          0,
+          1,
+          548
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:12",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "8",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:13",
+        "name": "Key9",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          216
+         ],
+         [
+          0,
+          1,
+          548
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:14",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "9",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:15",
+        "name": "KeyMul",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          314
+         ],
+         [
+          0,
+          1,
+          548
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9098039215686274,
+           "g": 0.8705882352941177,
+           "b": 0.9725490196078431,
+           "a": 1.0
+          },
+          "colorVar": "secondary-container"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:16",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.2901960784313726,
+             "g": 0.26666666666666666,
+             "b": 0.34509803921568627,
+             "a": 1.0
+            },
+            "colorVar": "on-secondary-container"
+           }
+          ],
+          "characters": "×",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:17",
+        "name": "Key4",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          634
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:18",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "4",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:19",
+        "name": "Key5",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          118
+         ],
+         [
+          0,
+          1,
+          634
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:20",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "5",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:21",
+        "name": "Key6",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          216
+         ],
+         [
+          0,
+          1,
+          634
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:22",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "6",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:23",
+        "name": "KeySub",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          314
+         ],
+         [
+          0,
+          1,
+          634
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9098039215686274,
+           "g": 0.8705882352941177,
+           "b": 0.9725490196078431,
+           "a": 1.0
+          },
+          "colorVar": "secondary-container"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:24",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.2901960784313726,
+             "g": 0.26666666666666666,
+             "b": 0.34509803921568627,
+             "a": 1.0
+            },
+            "colorVar": "on-secondary-container"
+           }
+          ],
+          "characters": "-",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:25",
+        "name": "Key1",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          720
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:26",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "1",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:27",
+        "name": "Key2",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          118
+         ],
+         [
+          0,
+          1,
+          720
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:28",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "2",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:29",
+        "name": "Key3",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          216
+         ],
+         [
+          0,
+          1,
+          720
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:30",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "3",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:31",
+        "name": "KeyAdd",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          314
+         ],
+         [
+          0,
+          1,
+          720
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9098039215686274,
+           "g": 0.8705882352941177,
+           "b": 0.9725490196078431,
+           "a": 1.0
+          },
+          "colorVar": "secondary-container"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:32",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.2901960784313726,
+             "g": 0.26666666666666666,
+             "b": 0.34509803921568627,
+             "a": 1.0
+            },
+            "colorVar": "on-secondary-container"
+           }
+          ],
+          "characters": "+",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:33",
+        "name": "Key0",
+        "type": "FRAME",
+        "size": {
+         "x": 184,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          806
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:34",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 184,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": "0",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:35",
+        "name": "KeyDot",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          216
+         ],
+         [
+          0,
+          1,
+          806
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9254901960784314,
+           "g": 0.9019607843137255,
+           "b": 0.9333333333333333,
+           "a": 1.0
+          },
+          "colorVar": "surface-container-high"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:36",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.11372549019607843,
+             "g": 0.10588235294117647,
+             "b": 0.12549019607843137,
+             "a": 1.0
+            },
+            "colorVar": "on-surface"
+           }
+          ],
+          "characters": ".",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 24,
+           "fontWeight": 400,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       },
+       {
+        "id": "n:37",
+        "name": "KeyEq",
+        "type": "FRAME",
+        "size": {
+         "x": 86,
+         "y": 74
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          314
+         ],
+         [
+          0,
+          1,
+          806
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.396078431372549,
+           "g": 0.3333333333333333,
+           "b": 0.5607843137254902,
+           "a": 1.0
+          },
+          "colorVar": "primary"
+         }
+        ],
+        "cornerRadius": 28,
+        "clipsContent": true,
+        "children": [
+         {
+          "id": "n:38",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 86,
+           "y": 74
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            },
+            "colorVar": "on-primary"
+           }
+          ],
+          "characters": "=",
+          "style": {
+           "fontFamily": "Roboto",
+           "fontSize": 26,
+           "fontWeight": 500,
+           "textAlignHorizontal": "CENTER",
+           "textAlignVertical": "CENTER"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "page:components",
+    "name": "Components",
+    "type": "CANVAS",
+    "backgroundColor": {
+     "r": 0.9411764705882353,
+     "g": 0.9411764705882353,
+     "b": 0.9529411764705882,
+     "a": 1.0
+    },
+    "children": [
+     {
+      "id": "switch:1",
+      "name": "Switch",
+      "type": "COMPONENT_SET",
+      "size": {
+       "x": 164,
+       "y": 72
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        40
+       ],
+       [
+        0,
+        1,
+        320
+       ]
+      ],
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 0.9921568627450981,
+         "g": 0.9686274509803922,
+         "b": 1.0,
+         "a": 1.0
+        },
+        "colorVar": "surface",
+        "opacity": 0.0
+       }
+      ],
+      "children": [
+       {
+        "id": "stateoff:1",
+        "name": "State=Off",
+        "type": "COMPONENT",
+        "size": {
+         "x": 52,
+         "y": 32
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          20
+         ],
+         [
+          0,
+          1,
+          20
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.9921568627450981,
+           "g": 0.9686274509803922,
+           "b": 1.0,
+           "a": 1.0
+          },
+          "colorVar": "surface",
+          "opacity": 0.0
+         }
+        ],
+        "strokes": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.47843137254901963,
+           "g": 0.4588235294117647,
+           "b": 0.4980392156862745,
+           "a": 1.0
+          },
+          "colorVar": "outline"
+         }
+        ],
+        "strokeWeight": 2.0,
+        "strokeAlign": "INSIDE",
+        "cornerRadius": 16,
+        "children": [
+         {
+          "id": "thumb:1",
+          "name": "Thumb",
+          "type": "ELLIPSE",
+          "size": {
+           "x": 16,
+           "y": 16
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            8
+           ],
+           [
+            0,
+            1,
+            8
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.47843137254901963,
+             "g": 0.4588235294117647,
+             "b": 0.4980392156862745,
+             "a": 1.0
+            },
+            "colorVar": "outline"
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "stateon:1",
+        "name": "State=On",
+        "type": "COMPONENT",
+        "size": {
+         "x": 52,
+         "y": 32
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          92
+         ],
+         [
+          0,
+          1,
+          20
+         ]
+        ],
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.396078431372549,
+           "g": 0.3333333333333333,
+           "b": 0.5607843137254902,
+           "a": 1.0
+          },
+          "colorVar": "primary"
+         }
+        ],
+        "cornerRadius": 16,
+        "children": [
+         {
+          "id": "thumb:2",
+          "name": "Thumb",
+          "type": "ELLIPSE",
+          "size": {
+           "x": 24,
+           "y": 24
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            24
+           ],
+           [
+            0,
+            1,
+            4
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 1.0,
+             "g": 1.0,
+             "b": 1.0,
+             "a": 1.0
+            },
+            "colorVar": "on-primary"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

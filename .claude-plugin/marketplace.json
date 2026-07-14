@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "figo",
+  "description": "figo plugin marketplace — Figma/HTML designs as pixel-faithful native apps",
+  "owner": {
+    "name": "nowasm"
+  },
+  "plugins": [
+    {
+      "name": "figo",
+      "source": "./",
+      "displayName": "figo — Figma/HTML designs as pixel-faithful native apps",
+      "description": "Turn Figma designs and HTML/React pages into pixel-faithful native apps (design + JS runtime). Includes the full AI closed loop: scaffold, design via figoedit MCP, script, screenshot self-verify. Engine-prefab export (Cocos / Unity / Godot) lives in the companion figo-convert repo.",
+      "version": "0.1.0",
+      "category": "development",
+      "keywords": [
+        "figma",
+        "ui",
+        "design",
+        "game-ui"
+      ],
+      "homepage": "https://github.com/nowasm/figo",
+      "repository": "https://github.com/nowasm/figo",
+      "license": "MIT"
+    }
+  ]
+}

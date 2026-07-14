@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Figo Portal F mark</title>
+  <desc id="desc">A forward-moving F crossing from a design frame into a runtime portal.</desc>
+  <defs><linearGradient id="flow" x1="18" y1="18" x2="111" y2="110" gradientUnits="userSpaceOnUse"><stop stop-color="#23CDB8"/><stop offset="0.5" stop-color="#4B7CFF"/><stop offset="1" stop-color="#7047EB"/></linearGradient></defs>
+  <path d="M102 17H38c-13 0-23 10-23 23v48c0 13 10 23 23 23h64" fill="none" stroke="#D9E3FF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M41 98V38h56M41 64h45" fill="none" stroke="url(#flow)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m83 48 17 16-17 16" fill="none" stroke="#7047EB" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="41" cy="38" r="6" fill="#F8FAFF"/>
+</svg>

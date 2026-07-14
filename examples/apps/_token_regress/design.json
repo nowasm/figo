@@ -1,0 +1,371 @@
+{
+ "name": "TokenRegress",
+ "variables": {
+  "modes": [
+   "compact",
+   "cozy"
+  ],
+  "activeMode": "compact",
+  "numbers": {
+   "space": [
+    8,
+    24
+   ],
+   "text-md": [
+    16,
+    24
+   ]
+  },
+  "colors": {
+   "accent": [
+    "#ff0000",
+    "#00ff00"
+   ]
+  }
+ },
+ "document": {
+  "id": "0:0",
+  "type": "DOCUMENT",
+  "children": [
+   {
+    "id": "0:1",
+    "name": "Page 1",
+    "type": "CANVAS",
+    "children": [
+     {
+      "id": "1:1",
+      "name": "Main",
+      "type": "FRAME",
+      "size": {
+       "x": 420,
+       "y": 900
+      },
+      "relativeTransform": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ]
+      ],
+      "fills": [
+       {
+        "type": "SOLID",
+        "color": {
+         "r": 1,
+         "g": 1,
+         "b": 1,
+         "a": 1
+        }
+       }
+      ],
+      "children": [
+       {
+        "id": "2:1",
+        "name": "Stack",
+        "type": "FRAME",
+        "size": {
+         "x": 300,
+         "y": 124
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          80
+         ]
+        ],
+        "layoutMode": "VERTICAL",
+        "primaryAxisSizingMode": "AUTO",
+        "counterAxisSizingMode": "FIXED",
+        "paddingLeft": 8,
+        "paddingRight": 8,
+        "paddingTop": 8,
+        "paddingBottom": 8,
+        "itemSpacing": 8,
+        "varBindings": {
+         "itemSpacing": "space",
+         "paddingTop": "space",
+         "paddingBottom": "space"
+        },
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.95,
+           "g": 0.95,
+           "b": 0.95,
+           "a": 1
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "2:11",
+          "name": "Stack Row A",
+          "type": "RECTANGLE",
+          "size": {
+           "x": 100,
+           "y": 50
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            8
+           ],
+           [
+            0,
+            1,
+            8
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "colorVar": "accent",
+            "color": {
+             "r": 0,
+             "g": 0,
+             "b": 0,
+             "a": 1
+            }
+           }
+          ]
+         },
+         {
+          "id": "2:12",
+          "name": "Stack Row B",
+          "type": "RECTANGLE",
+          "size": {
+           "x": 100,
+           "y": 50
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            8
+           ],
+           [
+            0,
+            1,
+            66
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.2,
+             "g": 0.2,
+             "b": 0.2,
+             "a": 1
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "3:1",
+        "name": "Stack2",
+        "type": "FRAME",
+        "size": {
+         "x": 300,
+         "y": 124
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          300
+         ]
+        ],
+        "layoutMode": "VERTICAL",
+        "primaryAxisSizingMode": "AUTO",
+        "counterAxisSizingMode": "FIXED",
+        "paddingLeft": 8,
+        "paddingRight": 8,
+        "paddingTop": 8,
+        "paddingBottom": 8,
+        "itemSpacing": 8,
+        "varBindings": {},
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 0.95,
+           "g": 0.95,
+           "b": 0.95,
+           "a": 1
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "3:11",
+          "name": "Stack2 Row A",
+          "type": "RECTANGLE",
+          "size": {
+           "x": 100,
+           "y": 50
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            8
+           ],
+           [
+            0,
+            1,
+            8
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "colorVar": "accent",
+            "color": {
+             "r": 0,
+             "g": 0,
+             "b": 0,
+             "a": 1
+            }
+           }
+          ]
+         },
+         {
+          "id": "3:12",
+          "name": "Stack2 Row B",
+          "type": "RECTANGLE",
+          "size": {
+           "x": 100,
+           "y": 50
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            8
+           ],
+           [
+            0,
+            1,
+            66
+           ]
+          ],
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0.2,
+             "g": 0.2,
+             "b": 0.2,
+             "a": 1
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "4:0",
+        "name": "TextWrap",
+        "type": "FRAME",
+        "size": {
+         "x": 200,
+         "y": 40
+        },
+        "relativeTransform": [
+         [
+          1,
+          0,
+          24
+         ],
+         [
+          0,
+          1,
+          560
+         ]
+        ],
+        "layoutMode": "VERTICAL",
+        "primaryAxisSizingMode": "AUTO",
+        "counterAxisSizingMode": "FIXED",
+        "fills": [
+         {
+          "type": "SOLID",
+          "color": {
+           "r": 1,
+           "g": 1,
+           "b": 1,
+           "a": 1
+          }
+         }
+        ],
+        "children": [
+         {
+          "id": "4:1",
+          "name": "Label",
+          "type": "TEXT",
+          "size": {
+           "x": 200,
+           "y": 20
+          },
+          "relativeTransform": [
+           [
+            1,
+            0,
+            0
+           ],
+           [
+            0,
+            1,
+            0
+           ]
+          ],
+          "characters": "The quick brown fox jumps over the lazy dog again and again and again.",
+          "style": {
+           "fontFamily": "Segoe UI",
+           "fontSize": 16,
+           "textAutoResize": "HEIGHT"
+          },
+          "fills": [
+           {
+            "type": "SOLID",
+            "color": {
+             "r": 0,
+             "g": 0,
+             "b": 0,
+             "a": 1
+            }
+           }
+          ],
+          "varBindings": {
+           "fontSize": "text-md"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

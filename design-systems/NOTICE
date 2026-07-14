@@ -1,0 +1,40 @@
+figo — design-systems/
+==========================
+
+This directory vendors design knowledge (design-system token sets and design
+process skills) from the Open Design project:
+
+    Open Design — https://github.com/nexu-io/open-design
+    Copyright (c) Nexu, Inc. and the Open Design contributors
+    Licensed under the Apache License, Version 2.0 (see LICENSE-APACHE-2.0.txt).
+
+What was taken (a curated subset, not the whole project):
+  - design-systems/<name>/{DESIGN.md, design-tokens.json, tokens.css, USAGE.md}
+    for 12 systems (linear-app, stripe, apple, notion, spotify, coinbase,
+    revolut, duolingo, airbnb, material, neobrutalism, framer).
+  - skills/{design-review, apple-hig, color-expert, brand-guidelines}.
+
+What was NOT taken: the upstream HTML/CSS/GSAP artifacts, plugins, and the
+Next.js/Electron application — figo renders Figma nodes through ThorVG, not
+a browser, so those runtime pieces do not apply here.
+
+Modifications by figo (per Apache-2.0 §4.b, "carry prominent notices"):
+  - Files copied verbatim; no edits to the upstream DESIGN.md / *.json content.
+  - README.md and TOKEN_MAPPING.md in this directory are original figo work
+    that adapts the upstream token schema to figo's figoedit MCP pipeline.
+
+Some skills are themselves curated from third parties; their own upstreams are
+recorded in each skill's SKILL.md frontmatter (e.g. design-review is curated
+from gstack by Garry Tan, https://github.com/garrytan/gstack).
+
+Separately vendored (NOT from Open Design, different license):
+  - skills/taste/ — an "anti-slop frontend" design-taste skill, vendored from
+    taste-skill (https://github.com/Leonxlnx/taste-skill), Copyright (c) 2026
+    Leonxlnx, MIT License (see skills/taste/LICENSE). A curated subset of the
+    upstream skills/ tree: the comprehensive main skill plus the portable
+    minimalist / soft / brutalist / redesign aesthetic variants, copied
+    verbatim. NOT taken: the upstream image-to-code / imagegen / brandkit /
+    stitch / gpt / output skills and the React/HTML/GSAP runtime pieces — figo
+    renders Figma nodes through ThorVG, not a browser. The framework-agnostic
+    taste principles are adapted to figo's figoedit MCP pipeline by the
+    .claude/skills/figo-design skill; see skills/taste/SOURCE.md.

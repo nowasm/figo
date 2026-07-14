@@ -1,0 +1,13 @@
+{
+  "name": "Form",
+  "design": "design.json",
+  "script": "app.js",
+  "viewport": [390, 844],
+  "entryFrame": "Form",
+  "fonts": "fonts",
+  "designSystem": "stripe",
+  "package": {
+    "id": "com.example.app",
+    "version": "1.0.0"
+  }
+}

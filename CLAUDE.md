@@ -1,0 +1,162 @@
+# figo — AI 工作指南
+
+把 Figma 文件当作 UI 运行时：**一个 app = 设计(.fig) + 逻辑(.js)**。
+C++ 库（解析 → 布局 → ThorVG 光栅化 → raylib 上屏）+ QuickJS 脚本层。
+
+## 构建与测试
+
+构建目录是 `build/`（CMake + Ninja）。CMake 工程名与静态库目标统一为 **figo**
+（`libfigo.a` / `libfigo_script.a` / `libfigo_raylib.a`）。引擎预制体导出器
+（figo2godot / figo2cocos / figo2unity）与 web2canvas 已拆分到同级
+**figo-convert** 仓库——它 add_subdirectory 本仓库拿核心库，转换任务去那边做。
+
+**macOS**（实测可用，clang++ + Ninja）——首次 configure 后增量编译只需在 `build/` 下：
+
+```bash
+cd build && cmake . && cmake --build . -j
+```
+
+**Windows**（MSVC /MD）**必须先加载 VS 环境**，PowerShell 里用临时 cmd 脚本包一层：
+
+```powershell
+$bat = 'call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1' + "`r`n" +
+       'cd /d <repo>\build' + "`r`n" + 'cmake --build . --config Release -j'
+Set-Content build\bw.cmd $bat -Encoding ascii; cmd /c "<repo>\build\bw.cmd"; Remove-Item build\bw.cmd
+```
+
+验证（都在 `build/` 下运行；Windows 加 `.exe` 后缀）：
+
+- `render_test` — 离屏渲染自检，应 `RESULT: OK`
+  （注：缺系统字体时 `auto-height text did not grow` 会单点失败，属环境问题非回归）
+- `layout_test` — 布局数学自测
+- `demo_wallet --selfdrive sd` — 全功能巡演（滚动/惯性/选区/转场/固定 tab 栏），
+  产出 `sd_*.png` 截图用 Read 工具目检
+- `figoplay <fig> <js> --shot out.png [--frames N]` — 渲 N 帧截图退出
+- `python tools/bench.py` — benchmark app 套件跑批（`examples/apps/` 下标
+  `"benchmark": true` 的 app 自驱断言，协议见 docs/benchmark-gaps.md），应全 PASS
+
+链接失败（Windows LNK1104 / macOS 占用）= exe 正在运行，先结束进程。临时截图用完即删。
+
+## AI 开发 app 的闭环
+
+> 从零做一个 app 走 **`/new-app` skill**（`.claude/skills/new-app/`）——脚手架
+> (`tools/figmanew.py`) → 设计（figoedit MCP，套 `design-systems/` 的审美 token）
+> → 写 app.js → `--shot` 自验 → 迭代。一个 app 也可是标准目录
+> `<dir>/app.json`（`figoplay <dir>`，字段见 README "app 工程"）。**要让设计不长成
+> AI 默认款，设计步骤套 `/figo-design` skill**（`.claude/skills/figo-design/`）——它默认
+> 加载 `design-systems/skills/taste/` 的反模板审美纪律并翻译到 figoedit 节点操作。下面是底层速查：
+
+1. **设计**：启动 `build\figoedit.exe <file.fig>`，仓库根 `.mcp.json` 已配置
+   figoedit 的 MCP（127.0.0.1:9223），用它的 21 个工具直接读改设计
+   （get_node_tree / create_node / update_nodes / import_image / import_svg /
+   audit_design / make_component / create_instance / sync_instances /
+   get_screenshot / save_document…）。**复用**：把建好的卡片/按钮/列表行用
+   `make_component` 标成 master，再 `create_instance` 盖章复用（保持一致）；改完
+   master 调 `sync_instances` 把样子传播到所有实例（figo 实例无活链，按需同步；
+   **经 update_nodes 打进实例子树的补丁会自动记为 override，sync 后回放保留**——
+   文案/颜色/显隐都不用重打；只有几何 x/y/w/h 与改名不算 override，master 里已
+   删除的目标其 override 会被丢弃并计入返回的 droppedOverrides）。插画支持两条路：
+   - **位图**：`import_image`（base64 `data` 或本地 `path`）把 PNG/JPEG/WebP 收进文档
+     （落在同级 `<doc>.assets/`，存进 .figo.json 后重开仍可解析），默认顺手建一个带
+     IMAGE fill 的节点；也可给任意节点设 `fill:{type:"IMAGE",imageRef,scaleMode}`。
+   - **矢量**：`import_svg`（`data` 是 SVG 文本或 `path` 指 .svg）把 SVG 拆成一个 FRAME +
+     每个图形一个 VECTOR（支持 path/rect/circle/ellipse/line/polygon、transform、实色
+     填充/描边、尽力而为的线性/径向渐变）。`monochrome:"#RRGGBB"` 把所有实色填充统一
+     成一色（适合图标）；`palette:{"oldhex":"#NEW"}` 按色值改色对接设计 token。保持矢量、
+     可缩放可改色，导引擎更干净。clipPath/mask 引用会导成 Clip/Mask Group（首子节点
+     为 isMask 蒙版，多形状取并集；`<mask>` 用 alpha 近似亮度）。不支持
+     text/`<image>`/`<use>`/filter。
+     **开箱图标**：`design-systems/icons/`（35 个 Lucide 描边图标，ISC）——
+     `import_svg {path:"design-systems/icons/<name>.svg", monochrome:"<token色>"}` 即可，
+     清单与加图标方法见该目录 README。
+2. **逻辑**：写 `app.js`。完整 JS API 见 `include/figo/script.h` 头部注释。速查：
+   - `ui.onClick/onHover`（回调带 viewport 坐标 x,y）、`ui.onLongPress`（≥0.5s，
+     消费 click）、`ui.onSwipe`（"left"/"right"）、`ui.onScroll`（同帧合并、惯性每帧派发）、
+     `ui.onUpdate`、`ui.navigateTo(name, "slideLeft", 0.3)` / `navigateBack`
+   - `ui.bindList(name, count, (item, i) => …)`，节点：`.find/.child/.parent/.index/.text/.type`、
+     `.scrollX/.scrollY`（可读写）、`.maxScrollX/.maxScrollY`
+   - `ui.setText/setVisible/setOpacity/setVariant/setScroll/setEditable/focusText`
+     （`setVariant(..., {duration})` = dissolve 淡入；`{duration, animate:"smart"}` =
+     Smart Animate——新旧变体子树按名字路径配对，位置/尺寸/透明度/纯色 fill 从旧态
+     tween 到新态（cubic-out），配不上的新节点淡入，全配不上回落 dissolve）
+   - 滚轮选择器地基：`node.snapToChildren`（滚动自然停下时吸附最近子项边界）+
+     `ui.onScrollEnd(name, fn(node,x,y,index))`（完全静止派发一次）+
+     `ui.snapTo(name, index, dur?)` + `node.snapIndex`（只读）
+   - 文本编辑：`ui.setPassword(name, bool)`（"•" 遮罩显示，`node.text` 仍明文，
+     copy/cut 返回空）、`ui.typeText(str)`、`ui.editKey("left"|…|"enter"|"selectAll"|
+     "copy"|"cut"|"paste")`——editKey 的剪贴板是进程内模拟的（copy/cut 返回所复制串）；
+     真实 OS 剪贴板只在 raylib 后端粘合（Ctrl/Cmd+C/X/V/A），两者互不干扰
+   - `ui.bindSlider(track, {min,max,step?,value,knob?,fill?,axis?,readonly?,onChange(v,committed)})`
+     —— slider/进度条语义：外观全是设计节点，引擎管手势→值（同轴优先于滚动）+
+     摆 knob/缩 fill；`ui.setValue(track, v)` 程序驱动（不触发 onChange）
+   - `ui.autoStates(name, {hover,pressed,base}?)` —— 组件实例 hover/press 自动切变体
+     （默认 State=Hover/Pressed/Default，0.12s dissolve，不吃点击）
+   - `ui.playSound(path, volume?) -> bool`（wav/ogg/mp3，路径相对 app 目录；宿主未注入
+     音频（如 web）时安静返回 false 不报错）
+   - **主题变量（design token）**：文档级变量表，**色值与数值两个命名空间**（token 名 →
+     各 mode 值）。fill/stroke 用 `colorVar` 绑定色 token；间距/圆角/字阶等数值 token 用
+     `ui.bindVar(nameOrNode, prop, varName)` 绑定（prop：fontSize/cornerRadius/
+     strokeWeight/itemSpacing/padding*；""解绑）。`ui.setThemeMode("dark")`（整体换肤，
+     数值绑定变化自动沿 auto-layout 祖先链重排 hug）、`ui.setVariable(name, "#hex"|数字,
+     mode?)` / `ui.setVariables({...}, mode?)`、`ui.getVariable(name, mode?)`、
+     `ui.bindFill(nameOrNode, varName)`。种子色生成整套 Material 3 配色走
+     `design-systems/theme/theme.js`（app.json `libs` 挂载）：`figoTheme.apply("#0b57d0")`
+     → light+dark 各 53 角色落表。figoedit MCP 对应 `get_variables`/`set_variables`
+     （colors + numbers）、fill 的 `colorVar` 字段、update_nodes 的 `varBindings`。
+     回归基准 `examples/apps/_token_regress/`；注意**平面父级下的裸 TEXT 改 fontSize
+     token 不会自动重排**（README 已知限制），要让字阶 token 生效需把文本放进
+     auto-layout 链
+   - `ui.find/findAll/tap/longPress(nameOrNode)`、`ui.pointerDown/Move/Up(x, y)`
+     （合成手势，多 move 手势限一个 tick 内）、`ui.setResizeMode("reflow")`
+   - `setTimeout/setInterval`（app 时间）、`fetch()`（Promise）、`localStorage`（持久化到
+     `<script>.storage.json`）
+3. **验证**：`figoplay.exe design.fig app.js --shot out.png` 后 Read 截图；
+   `--shot` 同时写 `out.diagnostics.json`（字体回退/文本截断/clipsContent 裁切的
+   结构化警告，空数组=干净；脚本内 `ui.diagnostics()` 直查）——截图"看起来不对
+   但不知道为什么"先看这里。
+   交互验证参考 `examples/scripts/wallet.js` 的 SELFDRIVE 模式（`ui.tap` 合成点击 +
+   `--selfdrive` 前缀截图）。figoplay 运行中改 .js 会热重载，脚本需可重入
+   （重跑一遍应幂等）。
+4. **设计质量评审**：走 **`/design-critic` skill**（`.claude/skills/design-critic/`）——
+   截图(看) + figoedit MCP 的 `audit_design`(量：离色板填充、不在字阶的字号、离间距阶/4pt
+   网格的 auto-layout 间距、低于 WCAG AA 的对比度——渐变底按最差 stop 判、colorVar 绑定的
+   还逐 mode 查 dark 平价、近重复圆角聚类) → 给具体修改项 → `update_nodes` 改 →
+   重审/重截图验证。`audit_design` 的 `tokensPath` 指向
+   `design-systems/<name>/design-tokens.json`。运行时侧的品质检查走
+   `ui.diagnostics({textStress:1.3, touchTargets:true, states:true})`（伪本地化溢出预测/
+   触控目标<44px/可点实例缺 Hover-Pressed 变体；零参调用行为不变，空数组=干净）。
+
+## 关键约定与坑
+
+- 设计数据修补（如 wallet.fig 的 Home 漏标固定导航）在脚本里做：
+  `ui.findAll("Bottom Nav Bar").forEach(n => n.scrollFixed = true)`。
+- 巡演/测试脚本**数帧不要累计 dt**——首帧 GetFrameTime 含文件加载耗时。
+- 合成多帧指针手势必须在一个 tick 内完成（pointerDown/Move/update/Up 一气呵成），
+  跨帧会和后端的真实鼠标喂入打架。
+- 转场/滚动动画时钟每帧最多计 1/30s；转场截图门控用
+  `ui.transitionProgress() >= 1`（转场中 eased [0,1)，**空闲返回 1**）。
+- 事件处理器里调 bindList/setVariant 会**立即停止本次冒泡**（结构变更消费
+  事件，同导航语义），且处理器持有的 node 参数随之失效——需要时重新 find。
+- **可点容器必须有 fill**：无 fill 的 FRAME 在子节点空隙处不可命中，
+  `ui.tap(node)` 返回 true 只表示派发了点击、不保证命中该节点（notes 实测：
+  行中心落在两行文本的间隙，点击落到底层节点，onClick 静默不触发）。
+  需要"不可见但可命中"（如滚轮行、遮罩）就给 **alpha=0 的 fill**。
+- 滚轮选择器配方（alarm）：容器 FIXED+VERTICAL_SCROLLING+snapToChildren，
+  行加 alpha=0 fill，选中带垫在滚轮 z 序之下；**paddingBottom 不进滚动范围**
+  （G15），尾部用空文本幻影行补可达性；`snapTo` 的 duration 是指数趋近、
+  非硬时限（0.2s 实测 ~0.4s 静止），巡演断言用 `snapTo(...,0)` 即时档。
+- wrap 网格 + bindList（calendar）：bindList 强制主轴 hug，而 WRAP 容器的
+  hug 量的是不折行宽度——给网格钉 `minWidth = maxWidth = 目标宽` 让 clamp
+  拉回折行；格内可切换元素（圆点/高亮）放**非 auto-layout 的格子里绝对定位**，
+  避免 G14 让 setVisible 重排网格。
+- ThorVG `Picture::load(path)` 自带按路径解码缓存；滚动/转场都不重建场景
+  （ScrollBinding 变换重定向 / 后端贴图合成），性能敏感改动先看 `src/renderer.cpp`。
+- .fig 输入靠 fig2json（`D:\work_open\fig2json`，Rust）转 canvas.json，缓存于
+  `<file>.fig.export/`；测试素材在 `D:\work_open\fig2psd\test\figma\`（wallet.fig 最全）。
+- Web 验证：渲染用 `msedge --headless=new --timeout=30000 --screenshot=...`
+  （`--virtual-time-budget` 会在 wasm 首帧前触发，不可用）；输入/日志用
+  `tools/web_test/`（serve.py 的 /slow 拖住 load 事件让 --dump-dom 晚截，
+  clicktest.html 派发真实 DOM 鼠标事件——**mousedown/up 必须隔几百 ms**，
+  同一帧间隙内会在 raylib 的状态轮询中互相抵消）。Web 画布固定 420x900：
+  raylib 的 RESIZABLE 在 web 上会造成 framebuffer/canvas 属性/CSS 三方尺寸
+  不一致，GLFW shim 鼠标坐标错位（点击全部偏移）。

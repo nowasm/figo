@@ -1,0 +1,11 @@
+{
+  "name": "Calculator",
+  "design": "design.figo.json",
+  "script": "app.js",
+  "fonts": "../../../design-systems/components/fonts",
+  "viewport": [420, 900],
+  "entryFrame": "Calculator",
+  "designSystem": "material",
+  "package": { "id": "com.figo.calculator", "version": "1.0.0" },
+  "benchmark": true
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Figo Portal F app icon">
+  <defs><linearGradient id="b" x1="10" y1="8" x2="118" y2="120" gradientUnits="userSpaceOnUse"><stop stop-color="#17233C"/><stop offset="1" stop-color="#0B1020"/></linearGradient><linearGradient id="f" x1="27" y1="29" x2="99" y2="99" gradientUnits="userSpaceOnUse"><stop stop-color="#2DE0C8"/><stop offset="0.52" stop-color="#5790FF"/><stop offset="1" stop-color="#8B67FF"/></linearGradient></defs>
+  <rect width="128" height="128" rx="30" fill="url(#b)"/>
+  <path d="M99 27H40c-9 0-16 7-16 16v42c0 9 7 16 16 16h59" fill="none" stroke="#33415D" stroke-width="8" stroke-linecap="round"/>
+  <path d="M42 91V39h51M42 64h42" fill="none" stroke="url(#f)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m80 50 15 14-15 14" fill="none" stroke="#A489FF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
