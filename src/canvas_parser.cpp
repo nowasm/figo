@@ -1150,6 +1150,15 @@ std::unique_ptr<Node> parseCanvasNode(const json& j, Node* parent, int depth) {
     parseCanvasPaints(j, "fillPaints", node->fills);
     parseCanvasPaints(j, "strokePaints", node->strokes);
     node->strokeWeight = jfloat(j, "strokeWeight", 1.0f);
+    // Independent per-side borders (a left accent bar, a bottom divider):
+    // kiwi borderStrokeWeightsIndependent + border*Weight, absent sides fall
+    // back to the uniform weight. Order: top, right, bottom, left.
+    if (jbool(j, "borderStrokeWeightsIndependent", false)) {
+        node->strokeSideWeights = {{jfloat(j, "borderTopWeight", node->strokeWeight),
+                                    jfloat(j, "borderRightWeight", node->strokeWeight),
+                                    jfloat(j, "borderBottomWeight", node->strokeWeight),
+                                    jfloat(j, "borderLeftWeight", node->strokeWeight)}};
+    }
     const std::string sa = jstr(j, "strokeAlign", "INSIDE");
     node->strokeAlign = sa == "OUTSIDE" ? StrokeAlign::Outside
                       : sa == "CENTER"  ? StrokeAlign::Center

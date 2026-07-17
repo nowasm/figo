@@ -256,6 +256,10 @@ struct NodeData {
     std::vector<Paint> strokes;
     float strokeWeight = 1.0f;
     StrokeAlign strokeAlign = StrokeAlign::Inside;
+    // Per-side border weights (Figma "independent" strokes — a left accent
+    // bar, a bottom divider). Order: top, right, bottom, left. Unset when the
+    // uniform strokeWeight applies. Rendered as a CSS-style border ring.
+    std::optional<std::array<float, 4>> strokeSideWeights;
     std::vector<float> strokeDashes;
     std::string strokeCap;   // NONE | ROUND | SQUARE
     std::string strokeJoin;  // MITER | BEVEL | ROUND

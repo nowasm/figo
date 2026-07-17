@@ -448,6 +448,30 @@ void pushStrokePaint(tvg::Scene& scene, const Paint& p, const Node& n) {
         return;
     }
 
+    // Independent per-side borders (a left accent bar, a bottom divider):
+    // Figma draws each side as a straight strip along its edge, CLIPPED to
+    // the node's (rounded) outline — the strips don't follow the corner
+    // arcs, so a 1px side shows a small gap at each rounded corner while a
+    // thick side tapers off along the arc. Union the strips in one shape
+    // (no double-blend for translucent paints) and clip to the outline.
+    if (n.strokeSideWeights && n.fillGeometry.empty()) {
+        const auto& w = *n.strokeSideWeights;  // top, right, bottom, left
+        if (w[0] <= 0 && w[1] <= 0 && w[2] <= 0 && w[3] <= 0) return;
+        auto* shape = tvg::Shape::gen();
+        if (w[0] > 0) shape->appendRect(0, 0, n.width, w[0]);
+        if (w[1] > 0) shape->appendRect(n.width - w[1], 0, w[1], n.height);
+        if (w[2] > 0) shape->appendRect(0, n.height - w[2], n.width, w[2]);
+        if (w[3] > 0) shape->appendRect(0, 0, w[3], n.height);
+        shape->fillRule(tvg::FillRule::NonZero);
+        auto* clip = tvg::Shape::gen();
+        appendPrimitive(*clip, n);  // rounded outline
+        shape->clip(clip);
+        applyFill(*shape, p, n);
+        applyPaintBlend(*shape, p);
+        scene.add(shape);
+        return;
+    }
+
     if (n.strokeWeight <= 0) return;
 
     // Open paths (no Z command anywhere) have no meaningful inside/outside —

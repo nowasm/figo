@@ -420,6 +420,13 @@ std::unique_ptr<Node> parseNode(const json& j, Node* parent) {
     parsePaints(j, "fills", node->fills);
     parsePaints(j, "strokes", node->strokes);
     node->strokeWeight = jfloat(j, "strokeWeight", 1.0f);
+    // REST-style per-side borders. Order: top, right, bottom, left.
+    if (auto it = j.find("individualStrokeWeights"); it != j.end() && it->is_object()) {
+        node->strokeSideWeights = {{jfloat(*it, "top", node->strokeWeight),
+                                    jfloat(*it, "right", node->strokeWeight),
+                                    jfloat(*it, "bottom", node->strokeWeight),
+                                    jfloat(*it, "left", node->strokeWeight)}};
+    }
     const std::string sa = jstr(j, "strokeAlign", "INSIDE");
     node->strokeAlign = sa == "OUTSIDE" ? StrokeAlign::Outside
                       : sa == "CENTER"  ? StrokeAlign::Center

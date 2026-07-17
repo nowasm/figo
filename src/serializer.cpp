@@ -154,6 +154,11 @@ json nodeJson(const Node& n) {
                            : n.strokeAlign == StrokeAlign::Outside ? "OUTSIDE"
                                                                    : "CENTER";
         if (!n.strokeDashes.empty()) j["strokeDashes"] = n.strokeDashes;
+        if (n.strokeSideWeights) {
+            const auto& w = *n.strokeSideWeights;
+            j["individualStrokeWeights"] = {
+                {"top", w[0]}, {"right", w[1]}, {"bottom", w[2]}, {"left", w[3]}};
+        }
         if (n.strokeCap != "NONE") j["strokeCap"] = n.strokeCap;
         if (n.strokeJoin != "MITER") j["strokeJoin"] = n.strokeJoin;
     }
