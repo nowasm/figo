@@ -3,6 +3,7 @@
 
 #include <array>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <thorvg.h>
@@ -37,11 +38,21 @@ struct BackdropBinding {
     uint8_t builtOpacity = 255;     // nodeScene opacity to restore after pass 1
 };
 
+// Every built (non-root) node's own scene and clipper: enough to retarget the
+// subtree when only the node's relativeTransform changes (editor drag) — the
+// move analogue of ScrollBinding. Scene rebuild dwarfs rasterization, so a
+// transform-only update is what keeps dragging interactive.
+struct NodeSceneBinding {
+    tvg::Scene* scene = nullptr;  // owned by the canvas scene graph
+    tvg::Shape* clip = nullptr;   // node's own clipper, if any
+};
+
 struct BuildContext {
     FontProvider* fonts = nullptr;
     std::string imageDir;
     std::vector<ScrollBinding>* scrollBindings = nullptr;  // filled during build
     std::vector<BackdropBinding>* backdropBindings = nullptr;  // filled during build
+    std::unordered_map<Node*, NodeSceneBinding>* nodeBindings = nullptr;  // ditto
 };
 
 // Returns a scene for the node subtree, or nullptr if the node is hidden.

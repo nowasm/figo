@@ -17,6 +17,17 @@ constexpr ::Color kAccent{13, 153, 255, 255};        // Figma selection blue
 constexpr ::Color kAccentDim{13, 153, 255, 50};
 inline float handleSize() { return ui(8.0f); }
 constexpr double kDoubleClickSec = 0.35;
+constexpr float kPadWorld = 48;     // raster padding: room for drop shadows
+constexpr float kMaxTexDim = 4096;  // per-texture dimension cap
+
+WorldRect paddedBounds(const Node& n) {
+    WorldRect wr = worldBounds(n);
+    wr.x0 -= kPadWorld;
+    wr.y0 -= kPadWorld;
+    wr.x1 += kPadWorld;
+    wr.y1 += kPadWorld;
+    return wr;
+}
 
 double g_lastClickTime = -1;
 Vector2 g_lastClickPos{};
@@ -79,7 +90,7 @@ void applyMove(EditorState& ed, float dwx, float dwy) {
         n->relativeTransform = before.transform;
         n->relativeTransform.m02 = std::round(before.transform.m02 + dx);
         n->relativeTransform.m12 = std::round(before.transform.m12 + dy);
-        ed.bumpNode(n);  // only this node's top-level frame re-rasterizes
+        ed.bumpNodeMoved(n);  // top-level translation keeps its raster
     }
     ed.gestureChanged = true;
 }
@@ -190,12 +201,71 @@ void nudgeSelection(EditorState& ed, float dx, float dy) {
     for (Node* n : ed.selection) {
         n->relativeTransform.m02 += dx;
         n->relativeTransform.m12 += dy;
-        ed.bumpNode(n);
+        ed.bumpNodeMoved(n);
     }
     ed.pushPropsUndo(std::move(before));
 }
 
 }  // namespace
+
+// ---- drag proxies -----------------------------------------------------------
+// The dragged children are rasterized once, suppressed from their frames'
+// scenes (one rebuild), and from then on every drag frame only re-places the
+// proxy textures — no ThorVG work at all until the mouse is released.
+
+void beginMoveProxies(EditorState& ed) {
+    if (!ed.dragProxies.empty()) return;
+    for (Node* n : ed.selection) {
+        // Top-level frames already move as cached textures.
+        if (!n->parent || n->parent == ed.page || n->renderSuppressed) continue;
+        const WorldRect wr = paddedBounds(*n);
+        if (wr.w() <= 0 || wr.h() <= 0) continue;
+
+        EditorState::DragProxy p;
+        p.node = n;
+        const float ez = std::min(ed.cam.zoom, kMaxTexDim / std::max(wr.w(), wr.h()));
+        const int tw = std::max(1, static_cast<int>(std::ceil(wr.w() * ez)));
+        const int th = std::max(1, static_cast<int>(std::ceil(wr.h() * ez)));
+        figo::Renderer r;
+        for (const auto& dir : ed.fontDirs) r.registerFontsFromDirectory(dir);
+        if (!ed.imageDir.empty()) r.setImageDirectory(ed.imageDir);
+        r.setFrame(n);
+        // Texture pixels = M × world. The proxy's root scene carries the
+        // node's parent-local transform, so fold the parent's absolute
+        // transform into the view: M × parentAbs × relative = M × absolute.
+        Mat23 view;
+        view.m00 = view.m11 = ez;
+        view.m02 = -wr.x0 * ez;
+        view.m12 = -wr.y0 * ez;
+        r.setViewTransform(view * n->parent->absoluteTransform);
+        if (r.setTarget(static_cast<uint32_t>(tw), static_cast<uint32_t>(th)) &&
+            r.render()) {
+            Image img{};
+            img.data = const_cast<uint32_t*>(r.pixels());
+            img.width = tw;
+            img.height = th;
+            img.mipmaps = 1;
+            img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+            p.tex = LoadTextureFromImage(img);
+            p.texValid = p.tex.id != 0;
+        }
+        // A failed raster keeps the node in its frame's scene (slow-path
+        // retargeting) rather than making it vanish mid-drag.
+        if (!p.texValid) continue;
+        n->renderSuppressed = true;
+        ed.bumpNode(n);  // one rebuild without the node — removes the ghost
+        ed.dragProxies.push_back(p);
+    }
+}
+
+void endMoveProxies(EditorState& ed) {
+    for (auto& p : ed.dragProxies) {
+        p.node->renderSuppressed = false;
+        ed.bumpNode(p.node);  // full-quality raster at the final position
+        if (p.texValid) UnloadTexture(p.tex);
+    }
+    ed.dragProxies.clear();
+}
 
 void updateCanvas(EditorState& ed) {
     const float mx = static_cast<float>(GetMouseX()) - ed.viewportX();
@@ -405,6 +475,7 @@ void updateCanvas(EditorState& ed) {
         float dwy = wy - ed.dragStartWY;
         const float distPx = std::hypot(mx - ed.dragStartScreen.x, my - ed.dragStartScreen.y);
         if (distPx > 3 || ed.gestureChanged) {  // drag threshold
+            if (!ed.gestureChanged) beginMoveProxies(ed);  // first real move
             if (shift) {  // axis lock
                 if (std::fabs(dwx) > std::fabs(dwy)) dwy = 0;
                 else dwx = 0;
@@ -484,8 +555,6 @@ void drawCanvas(EditorState& ed) {
     // redraws those textures. A frame re-rasterizes only when its content
     // version changed, or the zoom drifted >1.5x from its raster zoom (after
     // the view settles). Raster work is budgeted per UI frame.
-    constexpr float kPadWorld = 48;     // room for drop shadows
-    constexpr float kMaxTexDim = 4096;  // per-frame texture cap
     const double budgetEnd = GetTime() + 0.030;
     const float zoom = ed.cam.zoom;
 
@@ -499,11 +568,7 @@ void drawCanvas(EditorState& ed) {
     for (auto& childPtr : ed.page->children) {  // children order = back-to-front
         Node* child = childPtr.get();
         if (!child->visible) continue;
-        WorldRect wr = worldBounds(*child);
-        wr.x0 -= kPadWorld;
-        wr.y0 -= kPadWorld;
-        wr.x1 += kPadWorld;
-        wr.y1 += kPadWorld;
+        const WorldRect wr = paddedBounds(*child);
         if (wr.w() <= 0 || wr.h() <= 0) continue;
         const bool visible = wr.x0 <= vwx1 && wr.x1 >= vwx0 && wr.y0 <= vwy1 && wr.y1 >= vwy0;
         if (!visible) continue;
@@ -511,12 +576,44 @@ void drawCanvas(EditorState& ed) {
         auto& entry = ed.frameCache[child];
         entry.lastUsed = GetTime();
         const uint64_t ver = ed.versionOf(child);
-        const bool contentStale = !entry.texValid || entry.version != ver;
+        bool contentStale = !entry.texValid || entry.version != ver;
+
+        // Consume queued transform-only moves (drag): retarget each node's
+        // persistent tvg sub-scene in place — no scene rebuild, just a
+        // re-raster. Nodes without a registered scene fall back to rebuild.
+        if (auto pm = ed.pendingMoves.find(child); pm != ed.pendingMoves.end()) {
+            if (!contentStale && entry.renderer) {
+                for (Node* n : pm->second) {
+                    if (!entry.renderer->retargetNode(n)) {
+                        contentStale = true;
+                        break;
+                    }
+                }
+                if (!contentStale) entry.needsRaster = true;
+            } else {
+                contentStale = true;  // the rebuild covers the moves
+            }
+            ed.pendingMoves.erase(pm);
+        }
+
         const bool zoomStale =
             entry.zoom > 0 && (zoom > entry.zoom * 1.5f || zoom < entry.zoom / 1.5f);
-        const bool wantRaster = contentStale || (zoomStale && ed.viewSettled);
+        const bool wantRaster =
+            contentStale || entry.needsRaster || (zoomStale && ed.viewSettled);
 
-        if (wantRaster && (contentStale || GetTime() < budgetEnd)) {
+        // While a move/resize gesture is live, re-raster a stale frame at a
+        // rate its own cost affords (a raster that took N ms re-runs at most
+        // every 2N ms) so input stays responsive on heavy frames; the final
+        // state rasterizes unthrottled once the mouse is released.
+        bool allowRaster = contentStale || entry.needsRaster || GetTime() < budgetEnd;
+        const bool gestureLive =
+            ed.drag == DragMode::MoveNodes || ed.drag == DragMode::Resize;
+        if ((contentStale || entry.needsRaster) && gestureLive) {
+            allowRaster =
+                GetTime() - entry.lastRasterAt >= entry.lastRasterMs * 2e-3;
+        }
+
+        if (wantRaster && allowRaster) {
             if (!entry.renderer) {
                 entry.renderer = std::make_unique<figo::Renderer>();
                 for (const auto& dir : ed.fontDirs)
@@ -539,6 +636,9 @@ void drawCanvas(EditorState& ed) {
             const double t0 = GetTime();
             if (entry.renderer->render()) {
                 ed.lastRenderMs = static_cast<float>((GetTime() - t0) * 1000.0);
+                entry.lastRasterAt = GetTime();
+                entry.lastRasterMs = ed.lastRenderMs;
+                entry.needsRaster = false;
                 if (!entry.texValid || entry.tex.width != tw || entry.tex.height != th) {
                     if (entry.texValid) UnloadTexture(entry.tex);
                     Image img{};
@@ -567,6 +667,19 @@ void drawCanvas(EditorState& ed) {
         }
     }
     ed.docDirty = false;
+
+    // Dragged children ride on top as their pre-rasterized proxy textures —
+    // per frame this is a bounds lookup and a texture blit, nothing more.
+    for (const auto& p : ed.dragProxies) {
+        if (!p.texValid) continue;
+        const WorldRect wr = paddedBounds(*p.node);
+        float sx, sy;
+        ed.cam.worldToScreen(wr.x0, wr.y0, sx, sy);
+        const Rectangle src{0, 0, static_cast<float>(p.tex.width),
+                            static_cast<float>(p.tex.height)};
+        const Rectangle dst{vx + sx, vy + sy, wr.w() * zoom, wr.h() * zoom};
+        DrawTexturePro(p.tex, src, dst, {0, 0}, 0, WHITE);
+    }
 
     // ---- overlays ----
     auto drawNodeOutline = [&](const Node& n, ::Color color, float thickness) {

@@ -1787,6 +1787,9 @@ tvg::Scene* buildNodeScene(Node& node, const Mat23& parentAbs, BuildContext& ctx
     if (scrolled && ctx.scrollBindings) {
         ctx.scrollBindings->push_back({node.parent, &node, scene, clipShape, baseLocal});
     }
+    // Root scenes drop/replace the node's own transform, so retargeting them
+    // from relativeTransform would be wrong — register non-roots only.
+    if (!isRoot && ctx.nodeBindings) (*ctx.nodeBindings)[&node] = {scene, clipShape};
 
     applyEffects(*scene, node);
 

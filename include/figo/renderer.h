@@ -64,6 +64,15 @@ public:
     // cheaper than markDirty(); smooth scrolling depends on it.
     void markScrollDirty();
 
+    // Only `node`'s relativeTransform changed (editor drag): update its
+    // persistent sub-scene's transform in place and flag a re-raster — no
+    // scene rebuild, the move analogue of markScrollDirty(). Returns false
+    // when the node has no registered scene (hidden at build time, inside a
+    // boolean-op approximation, root frame…) — fall back to markDirty().
+    // Does not touch descendant absoluteTransforms; callers keeping their
+    // own hit-test transforms (the editor) must update those themselves.
+    bool retargetNode(Node* node);
+
     // Pixel access — RGBA8888, straight (non-premultiplied) alpha, row-major,
     // stride == width. Valid after the first successful render().
     const uint32_t* pixels() const;

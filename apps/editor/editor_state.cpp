@@ -376,6 +376,7 @@ void EditorState::beginGesture() {
 }
 
 void EditorState::commitGesture() {
+    endMoveProxies(*this);  // restore proxied nodes + full-quality re-raster
     if (!gestureChanged || gestureBefore.empty()) {
         gestureBefore.clear();
         return;
@@ -634,16 +635,20 @@ void EditorState::alignSelection(Align op) {
         }
         n->relativeTransform.m02 = std::round(n->relativeTransform.m02 + lx);
         n->relativeTransform.m12 = std::round(n->relativeTransform.m12 + ly);
-        bumpNode(n);
+        bumpNodeMoved(n);
         changed = true;
     }
     if (changed) pushPropsUndo(std::move(before));
 }
 
 void EditorState::markDocChanged() {
+    // Structural edits mid-drag (delete, undo, MCP): retire the proxies
+    // first so suppressed flags and textures never outlive their nodes.
+    endMoveProxies(*this);
     docDirty = true;
     renderer.markDirty();
     bumpAllFrames();
+    pendingMoves.clear();  // rebuild covers them; node pointers may be dying
     updateAbsoluteTransforms();
 }
 
@@ -660,17 +665,40 @@ void EditorState::bumpNode(Node* n) {
     updateAbsoluteTransforms();
 }
 
+void EditorState::bumpNodeMoved(Node* n) {
+    // A top-level frame's texture is placed at worldBounds() during composite,
+    // so translating it never changes raster content — nothing to invalidate.
+    // Moving a *child* queues a transform-only retarget of its persistent tvg
+    // scene (drawCanvas consumes it); a scene rebuild — path parsing, text
+    // layout — dwarfs rasterization and would make dragging stutter.
+    // A node riding a drag proxy has no scene in its frame (renderSuppressed)
+    // — its visual is the proxy texture, nothing to retarget.
+    if (n->parent != page && !n->renderSuppressed) {
+        Node* top = n;
+        while (top && top->parent && top->parent != page) top = top->parent;
+        if (top) {
+            auto& moved = pendingMoves[top];
+            if (std::find(moved.begin(), moved.end(), n) == moved.end())
+                moved.push_back(n);
+        }
+    }
+    docDirty = true;
+    updateAbsoluteTransforms();
+}
+
 void EditorState::bumpAllFrames() {
     if (!page) return;
     for (auto& c : page->children) ++frameVersion[c.get()];
 }
 
 void EditorState::invalidateCache() {
+    endMoveProxies(*this);  // runs before the old document dies
     for (auto& [node, entry] : frameCache) {
         if (entry.texValid) UnloadTexture(entry.tex);
     }
     frameCache.clear();
     frameVersion.clear();
+    pendingMoves.clear();
     docDirty = true;
 }
 

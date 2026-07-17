@@ -195,9 +195,25 @@ struct EditorState {
         float zoom = -1;        // raster zoom of the texture
         uint64_t version = ~0ull;
         double lastUsed = 0;
+        double lastRasterAt = 0;  // when the last raster finished
+        float lastRasterMs = 0;   // its cost (drives the in-gesture throttle)
+        bool needsRaster = false;  // retargeted transforms await a re-raster
     };
     std::unordered_map<Node*, FrameCacheEntry> frameCache;
     std::unordered_map<Node*, uint64_t> frameVersion;
+    // Transform-only moves (drag) waiting to be retargeted into the frame's
+    // persistent tvg scene — the cheap path that skips the scene rebuild.
+    std::unordered_map<Node*, std::vector<Node*>> pendingMoves;
+    // Live-drag proxies: each dragged child is rasterized ONCE at gesture
+    // start into its own texture and renderSuppressed in its frame; every
+    // drag frame just re-places the textures (zero raster). Release restores
+    // the node and re-rasterizes the frame at full quality.
+    struct DragProxy {
+        Node* node = nullptr;
+        Texture2D tex{};
+        bool texValid = false;
+    };
+    std::vector<DragProxy> dragProxies;
     std::string imageDir;                 // renderer config for cache entries
     std::vector<std::string> fontDirs;
 
@@ -209,6 +225,9 @@ struct EditorState {
 
     uint64_t versionOf(Node* topChild);
     void bumpNode(Node* n);           // invalidate the top-level frame containing n
+    void bumpNodeMoved(Node* n);      // like bumpNode, but a pure translation of a
+                                      // top-level frame keeps its raster (composite
+                                      // re-positions the cached texture)
     void bumpAllFrames();
     void invalidateCache();           // unload all textures (file/page switch)
     void updateAbsoluteTransforms();  // page-space transforms for hit testing
@@ -273,6 +292,10 @@ WorldRect worldBounds(const Node& n);
 // interaction + canvas (editor_canvas.cpp)
 void updateCanvas(EditorState& ed);
 void drawCanvas(EditorState& ed);
+// Drag proxies (see EditorState::dragProxies). begin is idempotent per
+// gesture; end restores the suppressed nodes and queues the full re-raster.
+void beginMoveProxies(EditorState& ed);
+void endMoveProxies(EditorState& ed);
 
 // panels (editor_panels.cpp)
 void drawToolbar(EditorState& ed);

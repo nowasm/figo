@@ -955,6 +955,138 @@ int main(int argc, char** argv) {
         if (failures == 0) std::printf("d7: spread/conic-stroke/image-fields checked\n");
     }
 
+    // retargetNode: a transform-only move through the persistent scene must
+    // land pixel-identical to a full scene rebuild at the same coordinates
+    // (the editor's drag path depends on it).
+    {
+        const char* moveDoc = R"({
+            "name": "move",
+            "document": {"id": "0:0", "name": "d", "type": "DOCUMENT", "children": [
+                {"id": "0:1", "name": "p", "type": "CANVAS", "children": [
+                    {"id": "1:1", "name": "F", "type": "FRAME",
+                     "size": {"x": 200, "y": 120},
+                     "relativeTransform": [[1, 0, 0], [0, 1, 0]],
+                     "fills": [{"type": "SOLID",
+                                "color": {"r": 1, "g": 1, "b": 1, "a": 1}}],
+                     "children": [
+                        {"id": "2:1", "name": "R", "type": "RECTANGLE",
+                         "size": {"x": 40, "y": 40},
+                         "relativeTransform": [[1, 0, 10], [0, 1, 10]],
+                         "fills": [{"type": "SOLID",
+                                    "color": {"r": 1, "g": 0, "b": 0, "a": 1}}]},
+                        {"id": "2:2", "name": "G", "type": "FRAME",
+                         "size": {"x": 60, "y": 60},
+                         "relativeTransform": [[1, 0, 120], [0, 1, 10]],
+                         "fills": [{"type": "SOLID",
+                                    "color": {"r": 0.9, "g": 0.9, "b": 0.9, "a": 1}}],
+                         "clipsContent": true,
+                         "children": [
+                            {"id": "3:1", "name": "B", "type": "RECTANGLE",
+                             "size": {"x": 20, "y": 20},
+                             "relativeTransform": [[1, 0, 5], [0, 1, 5]],
+                             "fills": [{"type": "SOLID",
+                                        "color": {"r": 0, "g": 0, "b": 1, "a": 1}}]}
+                         ]}
+                     ]}
+                ]}
+            ]}
+        })";
+        auto doc = figo::parseDocument(moveDoc);
+        figo::Node* frame = doc->findByName("F");
+        figo::Renderer r;
+        r.setFrame(frame);
+        const size_t total = 200 * 120;
+        std::vector<uint32_t> base, moved, rebuilt;
+        if (!r.setTarget(200, 120) || !r.render()) {
+            std::printf("FAIL: retarget baseline render did not run\n");
+            ++failures;
+        } else {
+            base.assign(r.pixels(), r.pixels() + total);
+            // Drag "R" by (60, 30) and nested "B" (inside a clipped frame,
+            // whose own clipper must follow) by (25, 25).
+            figo::Node* rect = doc->findByName("R");
+            figo::Node* nested = doc->findByName("B");
+            figo::Node* group = doc->findByName("G");
+            rect->relativeTransform.m02 += 60;
+            rect->relativeTransform.m12 += 30;
+            nested->relativeTransform.m02 += 25;
+            nested->relativeTransform.m12 += 25;
+            group->relativeTransform.m12 += 20;
+            const bool ok = r.retargetNode(rect) && r.retargetNode(nested) &&
+                            r.retargetNode(group);
+            if (!ok || !r.render()) {
+                std::printf("FAIL: retargetNode rejected a built node\n");
+                ++failures;
+            } else {
+                moved.assign(r.pixels(), r.pixels() + total);
+                figo::Renderer r2;
+                r2.setFrame(frame);
+                if (!r2.setTarget(200, 120) || !r2.render()) {
+                    std::printf("FAIL: retarget rebuild render did not run\n");
+                    ++failures;
+                } else {
+                    rebuilt.assign(r2.pixels(), r2.pixels() + total);
+                    if (moved == base) {
+                        std::printf("FAIL: retargetNode moved nothing\n");
+                        ++failures;
+                    }
+                    if (moved != rebuilt) {
+                        size_t diff = 0;
+                        for (size_t i = 0; i < total; ++i)
+                            if (moved[i] != rebuilt[i]) ++diff;
+                        std::printf("FAIL: retargetNode diverges from rebuild "
+                                    "(%zu px differ)\n", diff);
+                        ++failures;
+                    }
+                }
+            }
+        }
+        if (failures == 0) std::printf("retarget: transform-only move == rebuild\n");
+
+        // Drag-proxy math: rendering a nested node's subtree standalone with
+        // view = M × parentAbsolute must reproduce the very pixels the full
+        // frame render puts in that region (the editor's drag proxy).
+        {
+            figo::Node* nested = doc->findByName("B");
+            figo::Renderer rf;
+            rf.setFrame(frame);
+            figo::Mat23 m0;  // 1:1 world → pixels
+            rf.setViewTransform(m0);
+            figo::Renderer rp;
+            rp.setFrame(nested);
+            rp.setViewTransform(m0 * nested->parent->absoluteTransform);
+            if (!rf.setTarget(200, 120) || !rf.render() ||
+                !rp.setTarget(200, 120) || !rp.render()) {
+                std::printf("FAIL: proxy renders did not run\n");
+                ++failures;
+            } else {
+                // Compare the node's own footprint (world 150..170 x 60..80
+                // after the earlier moves), skipping its edge pixels (AA
+                // against different backdrops).
+                const uint32_t* fpx = rf.pixels();
+                const uint32_t* ppx = rp.pixels();
+                size_t diff = 0, opaque = 0;
+                for (int y = 63; y < 77; ++y) {
+                    for (int x = 153; x < 167; ++x) {
+                        const size_t i = static_cast<size_t>(y) * 200 + x;
+                        if (fpx[i] != ppx[i]) ++diff;
+                        if ((ppx[i] >> 24) > 200) ++opaque;
+                    }
+                }
+                if (opaque < 150) {
+                    std::printf("FAIL: proxy render footprint empty (%zu)\n", opaque);
+                    ++failures;
+                }
+                if (diff) {
+                    std::printf("FAIL: proxy pixels diverge from frame (%zu px)\n",
+                                diff);
+                    ++failures;
+                }
+            }
+        }
+        if (failures == 0) std::printf("proxy: standalone subtree == frame region\n");
+    }
+
     std::printf(failures ? "RESULT: %d failure(s)\n" : "RESULT: OK\n", failures);
     return failures;
 }

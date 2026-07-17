@@ -102,6 +102,9 @@ struct Renderer::Impl {
     // offsets they were built with (to delta-update hit-test transforms).
     std::vector<ScrollBinding> scrollBindings;
     std::unordered_map<Node*, std::pair<float, float>> appliedScroll;
+    // Every non-root node's own scene, for transform-only retargeting
+    // (editor drag) without a scene rebuild.
+    std::unordered_map<Node*, NodeSceneBinding> nodeBindings;
     // BACKGROUND_BLUR nodes registered during the last build; render() fills
     // each holder with a fresh blurred capture every raster (two-pass).
     std::vector<BackdropBinding> backdropBindings;
@@ -329,6 +332,34 @@ void Renderer::markDirty() { impl_->dirty = true; }
 
 void Renderer::markScrollDirty() { impl_->scrollDirty = true; }
 
+bool Renderer::retargetNode(Node* node) {
+    auto& d = *impl_;
+    if (d.dirty) return true;  // a full rebuild is queued and covers the move
+    auto it = d.nodeBindings.find(node);
+    if (it == d.nodeBindings.end()) return false;
+
+    // Recompute the scene's local matrix the same way the build does,
+    // including the parent's scroll shift.
+    Mat23 local = node->relativeTransform;
+    if (node->parent && node->parent->scrolls() && !node->scrollFixed) {
+        Mat23 shift;
+        shift.m02 = -node->parent->scrollX;
+        shift.m12 = -node->parent->scrollY;
+        local = shift * local;
+        // Keep the scroll machinery consistent: its cached pre-shift matrix
+        // must track the node's new position.
+        for (auto& b : d.scrollBindings) {
+            if (b.child == node) b.baseLocal = node->relativeTransform;
+        }
+    }
+    const tvg::Matrix m{local.m00, local.m01, local.m02,
+                        local.m10, local.m11, local.m12, 0, 0, 1};
+    it->second.scene->transform(m);
+    if (it->second.clip) it->second.clip->transform(m);
+    d.viewDirty = true;  // re-raster without rebuilding
+    return true;
+}
+
 void Renderer::setViewTransform(const Mat23& view) {
     const Mat23& cur = impl_->viewTransform;
     if (impl_->hasViewTransform && cur.m00 == view.m00 && cur.m01 == view.m01 &&
@@ -367,11 +398,13 @@ bool Renderer::render() {
         d.scrollBindings.clear();
         d.appliedScroll.clear();
         d.backdropBindings.clear();
+        d.nodeBindings.clear();
         BuildContext ctx;
         ctx.fonts = &d.fonts;
         ctx.imageDir = d.imageDir;
         ctx.scrollBindings = &d.scrollBindings;
         ctx.backdropBindings = &d.backdropBindings;
+        ctx.nodeBindings = &d.nodeBindings;
         // In view-transform (editor) mode the frame keeps its canvas position
         // so sibling frames of a page stay laid out; in fit mode it is
         // re-origined.
