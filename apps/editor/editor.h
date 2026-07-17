@@ -234,6 +234,7 @@ struct EditorState {
 
     // ui
     std::unordered_set<Node*> expanded;  // layers tree
+    Node* layersReveal = nullptr;        // scroll this row into view next draw
     float layersScroll = 0;
     float inspectorScroll = 0;
     std::string status;
@@ -253,6 +254,7 @@ struct EditorState {
     // selection helpers
     bool isSelected(Node* n) const;
     void setSelection(std::vector<Node*> sel);
+    void revealInLayers(Node* n);  // expand ancestors + scroll the tree to n
 
     // edits
     void beginGesture();                     // capture NodeProps of selection

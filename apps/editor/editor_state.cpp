@@ -331,6 +331,7 @@ void EditorState::selectPage(int index) {
     scope = page;
     selection.clear();
     hovered = nullptr;
+    layersReveal = nullptr;
     renderer.setFrame(page);
     docDirty = true;
     updateAbsoluteTransforms();
@@ -368,6 +369,14 @@ bool EditorState::isSelected(Node* n) const {
 }
 
 void EditorState::setSelection(std::vector<Node*> sel) { selection = std::move(sel); }
+
+void EditorState::revealInLayers(Node* n) {
+    if (!n) return;
+    // Tree rows start at the page's children, so the page itself never needs
+    // an expanded entry.
+    for (Node* p = n->parent; p && p != page; p = p->parent) expanded.insert(p);
+    layersReveal = n;
+}
 
 void EditorState::beginGesture() {
     gestureBefore.clear();

@@ -403,6 +403,7 @@ void updateCanvas(EditorState& ed) {
                 ed.scope = container;
                 Node* inner = scopedHit(ed, wx, wy);
                 ed.selection = inner ? std::vector<Node*>{inner} : std::vector<Node*>{};
+                ed.revealInLayers(inner ? inner : container);
             }
         } else {
             Node* hit = ctrl ? deepHit(*ed.page, wx, wy) : scopedHit(ed, wx, wy);

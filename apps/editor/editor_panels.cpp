@@ -266,6 +266,20 @@ void drawLayerRows(LayerRowCtx& c, Node& n, int depth) {
     }
 }
 
+// y offset (from the top of the tree content) of `target`'s row, walking the
+// same visible-row order as drawLayerRows. Returns false if the row is not
+// currently visible (collapsed ancestor / not in this page).
+bool rowOffsetOf(EditorState& ed, Node& n, Node* target, float& y) {
+    if (&n == target) return true;
+    y += ui(22);
+    if (!n.children.empty() && ed.expanded.count(&n) > 0) {
+        for (auto it = n.children.rbegin(); it != n.children.rend(); ++it) {
+            if (rowOffsetOf(ed, **it, target, y)) return true;
+        }
+    }
+    return false;
+}
+
 float treeHeight(EditorState& ed, Node& n) {
     float h = ui(22);
     if (!n.children.empty() && ed.expanded.count(&n) > 0) {
@@ -288,6 +302,25 @@ void drawLayersPanel(EditorState& ed) {
 
     if (mouseInPanel) {
         ed.layersScroll -= GetMouseWheelMove() * ui(44);
+    }
+
+    // Reveal request (canvas selection): ancestors were already expanded by
+    // revealInLayers; scroll the target row into view if it is outside it.
+    if (ed.layersReveal) {
+        float y = 0;
+        bool found = false;
+        for (auto it = ed.page->children.rbegin();
+             it != ed.page->children.rend() && !found; ++it) {
+            found = rowOffsetOf(ed, **it, ed.layersReveal, y);
+        }
+        if (found) {
+            const float rowH = ui(22);
+            const float viewH = sh - kToolbarH - ui(12);
+            if (y < ed.layersScroll || y + rowH > ed.layersScroll + viewH) {
+                ed.layersScroll = std::max(0.0f, y - viewH * 0.4f);
+            }
+        }
+        ed.layersReveal = nullptr;
     }
 
     BeginScissorMode(0, kToolbarH, kLayersW, sh - kToolbarH);

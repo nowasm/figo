@@ -66,6 +66,7 @@ bool openFile(EditorState& ed, const std::string& path) {
         ed.undoStack.clear();
         ed.redoStack.clear();
         ed.expanded.clear();
+        ed.layersReveal = nullptr;
         ed.unsaved = false;
         ed.selectPage(0);
         ed.updateAbsoluteTransforms();
