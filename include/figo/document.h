@@ -91,6 +91,9 @@ struct Paint {
     // CROP: Figma imageTransform — affine mapping normalized node space to
     // normalized image space, row-major [[a,b,tx],[c,d,ty]] flattened.
     std::optional<std::array<float, 6>> imageTransform;
+    // Per-paint blend mode (e.g. a white SATURATION fill desaturating the
+    // paints below it). "" / NORMAL = default alpha blending.
+    std::string blendMode;
 };
 
 enum class NodeType {

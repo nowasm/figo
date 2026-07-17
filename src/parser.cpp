@@ -82,6 +82,10 @@ Paint parsePaint(const json& j) {
 
     p.visible = jbool(j, "visible", true);
     p.opacity = jfloat(j, "opacity", 1.0f);
+    if (const std::string bm = jstr(j, "blendMode");
+        !bm.empty() && bm != "NORMAL" && bm != "PASS_THROUGH") {
+        p.blendMode = bm;
+    }
 
     if (auto it = j.find("color"); it != j.end() && it->is_object()) {
         p.color = parseColor(*it);

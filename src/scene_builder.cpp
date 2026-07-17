@@ -338,6 +338,15 @@ tvg::Paint* makeImage(const Paint& p, const Node& n, const BuildContext& ctx) {
     return pic;
 }
 
+tvg::BlendMethod blendMethodOf(const std::string& mode);
+
+// Per-paint blend mode (a white SATURATION fill desaturates what's below).
+void applyPaintBlend(tvg::Paint& tp, const Paint& p) {
+    if (p.blendMode.empty()) return;
+    const tvg::BlendMethod bm = blendMethodOf(p.blendMode);
+    if (bm != tvg::BlendMethod::Normal) tp.blend(bm);
+}
+
 // Shapes for one paint over the node's fill geometry (or primitive outline).
 void pushFillPaint(tvg::Scene& scene, const Paint& p, const Node& n,
                    const BuildContext& ctx) {
@@ -350,6 +359,7 @@ void pushFillPaint(tvg::Scene& scene, const Paint& p, const Node& n,
             appendPrimitive(*clip, n);
             img->clip(clip);
             img->opacity(static_cast<uint8_t>(std::lround(p.opacity * 255)));
+            applyPaintBlend(*img, p);
             scene.add(img);
         }
         return;
@@ -362,6 +372,7 @@ void pushFillPaint(tvg::Scene& scene, const Paint& p, const Node& n,
             auto* clip = tvg::Shape::gen();
             appendOutline(*clip, n);
             pic->clip(clip);
+            applyPaintBlend(*pic, p);
             scene.add(pic);
             return;
         }
@@ -378,12 +389,14 @@ void pushFillPaint(tvg::Scene& scene, const Paint& p, const Node& n,
             }
             shape->fillRule(geom.evenOdd ? tvg::FillRule::EvenOdd : tvg::FillRule::NonZero);
             applyFill(*shape, p, n);
+            applyPaintBlend(*shape, p);
             scene.add(shape);
         }
     } else if (n.width > 0 || n.height > 0) {
         auto* shape = tvg::Shape::gen();
         appendPrimitive(*shape, n);
         applyFill(*shape, p, n);
+        applyPaintBlend(*shape, p);
         scene.add(shape);
     }
 }
@@ -429,6 +442,7 @@ void pushStrokePaint(tvg::Scene& scene, const Paint& p, const Node& n) {
             }
             shape->fillRule(geom.evenOdd ? tvg::FillRule::EvenOdd : tvg::FillRule::NonZero);
             applyFill(*shape, p, n);
+            applyPaintBlend(*shape, p);
             scene.add(shape);
         }
         return;
@@ -480,6 +494,7 @@ void pushStrokePaint(tvg::Scene& scene, const Paint& p, const Node& n) {
             mask->fill(255, 255, 255, 255);
             shape->mask(mask, tvg::MaskMethod::InvAlpha);
         }
+        applyPaintBlend(*shape, p);
         scene.add(shape);
     };
 

@@ -759,6 +759,10 @@ Paint parseCanvasPaint(const json& j) {
 
     p.visible = jbool(j, "visible", true);
     p.opacity = jfloat(j, "opacity", 1.0f);
+    if (const std::string bm = jstr(j, "blendMode");
+        !bm.empty() && bm != "NORMAL" && bm != "PASS_THROUGH") {
+        p.blendMode = bm;
+    }
     if (j.contains("color") && j["color"].is_string())
         p.color = parseHexColor(j["color"].get<std::string>());
 
@@ -830,6 +834,18 @@ Paint parseCanvasPaint(const json& j) {
     }
     p.imageScaleMode = jstr(j, "scaleMode", "FILL");
     p.imageScale = jfloat(j, "scalingFactor", jfloat(j, "scale", 1.0f));
+    // Kiwi-style image placement: STRETCH + a `transform` bag is Figma's crop
+    // (REST exposes it as CROP + imageTransform). Same convention — the matrix
+    // maps normalized node space into normalized image space.
+    if (p.type == PaintType::Image && p.imageScaleMode == "STRETCH" &&
+        j.contains("transform") && j["transform"].is_object()) {
+        const json& t = j["transform"];
+        const float rad = jfloat(t, "rotation") * kPi / 180.0f;
+        const float sx = jfloat(t, "scaleX", 1.0f), sy = jfloat(t, "scaleY", 1.0f);
+        p.imageTransform = {{std::cos(rad) * sx, -std::sin(rad) * sy, jfloat(t, "x"),
+                             std::sin(rad) * sx, std::cos(rad) * sy, jfloat(t, "y")}};
+        p.imageScaleMode = "CROP";
+    }
     if (auto t = j.find("imageTransform"); t != j.end() && t->is_array() && t->size() >= 2 &&
         (*t)[0].is_array() && (*t)[0].size() >= 3 && (*t)[1].is_array() && (*t)[1].size() >= 3) {
         p.imageTransform = {{(*t)[0][0].get<float>(), (*t)[0][1].get<float>(),

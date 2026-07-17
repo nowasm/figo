@@ -52,6 +52,7 @@ json paintJson(const Paint& p) {
     }
     if (!p.visible) j["visible"] = false;
     if (p.opacity != 1.0f) j["opacity"] = p.opacity;
+    if (!p.blendMode.empty()) j["blendMode"] = p.blendMode;
     if (!p.colorVar.empty()) j["colorVar"] = p.colorVar;
     if (p.type == PaintType::Solid) {
         j["color"] = colorJson(p.color);
