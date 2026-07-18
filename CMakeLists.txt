@@ -64,7 +64,12 @@ endif()
 # ---- core library ----
 # fig2json CLI used to convert .fig files at load time (override at runtime
 # with the FIGO_FIG2JSON environment variable).
-set(FIGO_FIG2JSON "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.exe"
+if(WIN32)
+    set(_fig2json_cli "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.exe")
+else()
+    set(_fig2json_cli "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json")
+endif()
+set(FIGO_FIG2JSON "${_fig2json_cli}"
     CACHE FILEPATH "Path to the fig2json executable")
 
 add_library(figo STATIC
@@ -86,14 +91,22 @@ target_compile_definitions(figo PRIVATE
 # fig2json as a static library → in-process .fig conversion (no subprocess).
 # Build it with: cargo build --release (crate-type staticlib). When absent,
 # loading falls back to the fig2json CLI.
-set(FIGO_FIG2JSON_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.lib"
+if(WIN32)
+    set(_fig2json_lib "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/fig2json.lib")
+else()
+    set(_fig2json_lib "${CMAKE_CURRENT_SOURCE_DIR}/../fig2json/target/release/libfig2json.a")
+endif()
+set(FIGO_FIG2JSON_LIB "${_fig2json_lib}"
     CACHE FILEPATH "Path to the fig2json static library (empty/missing → CLI fallback)")
-if(EXISTS "${FIGO_FIG2JSON_LIB}" AND WIN32)  # a Windows static lib
+if(EXISTS "${FIGO_FIG2JSON_LIB}")
     target_compile_definitions(figo PRIVATE FIGO_HAVE_FIG2JSON_LIB)
     target_link_libraries(figo PUBLIC "${FIGO_FIG2JSON_LIB}")
     if(WIN32)
         # Rust std dependencies.
         target_link_libraries(figo PUBLIC ws2_32 userenv ntdll bcrypt advapi32)
+    else()
+        # fig2json's bzip2 crate links the system libbz2.
+        target_link_libraries(figo PUBLIC bz2)
     endif()
 endif()
 target_include_directories(figo
