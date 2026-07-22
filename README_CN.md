@@ -19,7 +19,9 @@ React/HTML ──web2canvas───────┘   （自动识别格式）  
 ```
 
 **引擎预制体转换器**（figo2godot → Godot 4、figo2cocos → Cocos Creator 3.x、
-figo2unity → Unity UGUI）和 web2canvas 采集工具已拆分到同级 **figo-convert**
+figo2unity → Unity UGUI）的**预编译二进制随本仓库附带**（[`prebuild/`](prebuild/)，
+Windows x64 + macOS universal）——仅凭本仓库即可测试 Figma → 引擎预制体转换，
+无需构建。其源码和 web2canvas 采集工具在同级 **figo-convert**
 仓库，它以本仓库核心库为依赖。
 
 运行时路径（ThorVG）：
@@ -54,8 +56,11 @@ Windows 预编译二进制(macOS/Linux 走源码构建,技能里有完整步骤)
 | `figo:new-app` | 从零做一个完整 app(设计 + JS 逻辑) |
 | `figo:figo-design` | 带反模板审美纪律的界面设计 |
 | `figo:design-critic` | 视觉评审 + token 合规闭环 |
+| `figo:export-prefab` | 用仓库自带预编译转换器把设计转成 Cocos / Unity / Godot 预制体 |
 
-引擎导出技能（`figo2cocos` / `figo2unity` / `web-to-godot`）已移至 figo-convert 仓库。
+各引擎的深度适配技能（`figo2cocos` / `figo2unity` / `web-to-godot`）在
+figo-convert 仓库；普通转换用 `prebuild/` 预编译二进制（配 `figo:export-prefab`
+技能）即可。
 
 插件自带的 MCP 连接(figoedit `127.0.0.1:9223`、cocos-cli `:9527`)只在对应
 编辑器/CLI 运行时才连上——在那之前 `/mcp` 里显示"失败"属预期。
@@ -340,19 +345,33 @@ GET https://api.figma.com/v1/files/<FILE_KEY>?geometry=paths
   constraints/stack 字段）；旧缓存会因 fig2json 更新自动重新转换。
   `layout_test.exe` 为布局数学的无窗口自测。
 
-## 引擎预制体导出（已拆分到 figo-convert）
+## 引擎预制体导出（预编译二进制已随仓库附带）
 
-把设计（或 React/HTML 页面）转换成**游戏引擎预制体**的整条链已拆分到同级
-**figo-convert** 仓库（它链接本仓库的核心库）：
+把设计（或 React/HTML 页面）转换成**游戏引擎预制体**：
 
 ```
-React/HTML ──web2canvas──▶ canvas.json ──┬─▶ figo2godot ─▶ Godot 4 工程（.tscn + sprites）
-                                            ├─▶ figo2cocos ─▶ Cocos Creator 3.x 预制体
-                                            └─▶ figo2unity ─▶ Unity UGUI 预制体
+.fig / canvas.json / Figma REST JSON ──┬─▶ figo2godot ─▶ Godot 4 工程（.tscn + sprites）
+React/HTML ──web2canvas──▶ canvas.json ─┼─▶ figo2cocos ─▶ Cocos Creator 3.x 预制体
+                                          └─▶ figo2unity ─▶ Unity UGUI 预制体
 ```
 
-把 figo-convert 克隆到本仓库同级目录，构建与用法见其 README；贴图由
-`Renderer::renderOverlay` 烘焙，与 figo 运行时逐像素一致。
+**无需构建**——预编译转换器已在 [`prebuild/`](prebuild/)（`win-x64/` 与
+`macos/`，`.fig` 解析已静态链接）。用仓库自带示例立即可试：
+
+```
+prebuild/win-x64/figo2cocos.exe examples/apps/login/design.json out/cocos
+prebuild/win-x64/figo2unity.exe examples/apps/login/design.json out/unity
+prebuild/win-x64/figo2godot.exe examples/apps/login/design.json out/godot
+```
+
+每条输出 `RESULT: OK, 2 prefab(s), ...`；产物直接拷进引擎工程即可（Godot
+产物自带 `project.godot`，可直接作为工程打开）。Unity 注意：默认导出对应
+**Gamma** 颜色空间工程，Linear 工程请加 `--linear` 重新导出。详见
+[`prebuild/README.md`](prebuild/README.md)。
+
+贴图由 `Renderer::renderOverlay` 烘焙，与 figo 运行时逐像素一致。转换器源码
+和 web2canvas 采集工具在同级 **figo-convert** 仓库（链接本仓库核心库）——
+Linux 构建或修改导出逻辑去那边。
 
 ## 一键多端打包（figmapack）
 

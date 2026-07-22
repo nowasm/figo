@@ -23,8 +23,11 @@ React/HTML ──web2canvas───────┘  (format auto-detected) (Fra
 ```
 
 The **engine-prefab converters** (figo2godot → Godot 4, figo2cocos → Cocos
-Creator 3.x, figo2unity → Unity UGUI) and the web2canvas capture tool live in
-the sibling **figo-convert** repo, which consumes this repo's core library.
+Creator 3.x, figo2unity → Unity UGUI) ship as **prebuilt binaries in
+[`prebuild/`](prebuild/)** (Windows x64 + macOS universal) — you can test
+Figma → engine-prefab conversion from this repo alone, no build step. Their
+source, and the web2canvas capture tool, live in the sibling **figo-convert**
+repo, which consumes this repo's core library.
 
 Runtime path (ThorVG):
 
@@ -59,9 +62,11 @@ the skill walks through it) and verifies the toolchain.
 | `figo:new-app` | build a complete app (design + JS logic) from scratch |
 | `figo:figo-design` | design screens with anti-template taste discipline |
 | `figo:design-critic` | visual review + token-compliance audit loop |
+| `figo:export-prefab` | design → Cocos / Unity / Godot prefabs via the bundled prebuilt converters |
 
-The engine-export skills (`figo2cocos` / `figo2unity` / `web-to-godot`) moved
-to the figo-convert repo.
+The deep per-engine adaptation skills (`figo2cocos` / `figo2unity` /
+`web-to-godot`) live in the figo-convert repo; for plain conversion the
+prebuilt binaries in `prebuild/` (driven by `figo:export-prefab`) are enough.
 
 The bundled MCP servers (figoedit on `127.0.0.1:9223`, cocos-cli on `:9527`)
 connect only while the corresponding editor/CLI is running — a "failed" state
@@ -392,20 +397,36 @@ downloaded separately (`/v1/images`) into the directory given to
   constraints/stack fields); stale caches re-convert automatically when fig2json
   updates. `layout_test.exe` is the headless self-test for the layout math.
 
-## Engine-prefab export (moved to figo-convert)
+## Engine-prefab export (prebuilt binaries included)
 
-Turning a design (or a React/HTML page) into **game-engine prefabs** lives in
-the sibling **figo-convert** repo, which links this repo's core library:
+Turning a design (or a React/HTML page) into **game-engine prefabs**:
 
 ```
-React/HTML ──web2canvas──▶ canvas.json ──┬─▶ figo2godot ─▶ Godot 4 project (.tscn + sprites)
-                                            ├─▶ figo2cocos ─▶ Cocos Creator 3.x prefabs
-                                            └─▶ figo2unity ─▶ Unity UGUI prefabs
+.fig / canvas.json / Figma REST JSON ──┬─▶ figo2godot ─▶ Godot 4 project (.tscn + sprites)
+React/HTML ──web2canvas──▶ canvas.json ─┼─▶ figo2cocos ─▶ Cocos Creator 3.x prefabs
+                                          └─▶ figo2unity ─▶ Unity UGUI prefabs
 ```
 
-Clone figo-convert next to this repo and see its README for build and usage;
-sprites are baked by `Renderer::renderOverlay`, pixel-identical to the figo
-runtime.
+**No build needed** — prebuilt converters ship in [`prebuild/`](prebuild/)
+(`win-x64/` and `macos/`, `.fig` parsing statically linked). Try it right away
+with the bundled sample:
+
+```
+prebuild/win-x64/figo2cocos.exe examples/apps/login/design.json out/cocos
+prebuild/win-x64/figo2unity.exe examples/apps/login/design.json out/unity
+prebuild/win-x64/figo2godot.exe examples/apps/login/design.json out/godot
+```
+
+Each prints `RESULT: OK, 2 prefab(s), ...`; drop the output into your engine
+project (Godot output even includes a `project.godot`, openable directly).
+Unity note: the default export matches a **Gamma** color-space project;
+re-export with `--linear` for Linear-color-space projects. See
+[`prebuild/README.md`](prebuild/README.md) for details.
+
+Sprites are baked by `Renderer::renderOverlay`, pixel-identical to the figo
+runtime. Converter source and the web2canvas capture tool live in the sibling
+**figo-convert** repo (it links this repo's core library) — go there to build
+for Linux or to hack on export logic.
 
 ## One-command multi-platform packaging (figmapack)
 
